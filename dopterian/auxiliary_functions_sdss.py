@@ -6,9 +6,9 @@ from scipy.ndimage import binary_dilation,median_filter
 
 ### astronomy packages
 from pyraf import iraf
-from astropysics import coords
+from astropy import coordinates as coords
 import pywcs
-import pyfits
+import astropy.io.fits as pyfits
 import cosmology as cosmos
 
 def rescale_rexc(r_exc,z_low,z_high):
@@ -82,7 +82,7 @@ def imagecut(imgname,ra,dec,path,exptime,hsize):
     yu=int(yc+hsize)
 
     if os.path.isfile(path+'galaxy.fits'):
-        print "galaxy.fits exists, removing old file\n"
+        print("galaxy.fits exists, removing old file")
         os.system('rm '+path+'galaxy.fits')
 
     if os.path.isfile(path+'intermed.fits'):

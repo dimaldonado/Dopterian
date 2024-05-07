@@ -5,7 +5,7 @@ import scipy.optimize as scopt
 import scipy.ndimage as scndi
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as mpl
-import .cosmology as cosmos
+import cosmology as cosmos
 import astropy.modeling as apmodel
 import astropy.convolution as apcon
 import warnings
@@ -282,7 +282,7 @@ def ferengi_psf_centre(psf,debug=False):
         cenX = pars.y_mean.value
     else:
         for warn in w:
-            print warn
+            print(warn)
         cenX = center_psf.shape[0]/2+N%2
         cenY = center_psf.shape[1]/2+N%2
     
@@ -301,19 +301,7 @@ def ferengi_deconvolve(wide,narrow):#TBD
     Nn,Mn=narrow.shape #Assumes narrow and wide have the same shape
     
     
-    smax = max(Nn,Mn) 
-    bigsz=2    
-    while bigsz<smax:
-        bigsz*=2
-
-    if bigsz>2048:
-        print 'Requested PSF array is larger than 2x2k!'
-    
-    psf_n_2k = np.zeros([bigsz,bigsz],dtype=np.double)
-    psf_w_2k = np.zeros([bigsz,bigsz],dtype=np.double)
-    
-    psf_n_2k[0:Nn,0:Mn]=narrow
-    psf_w_2k[0:Nn,0:Mn]=wide
+    print('Requested PSF array is larger than 2x2k!')
     
 #    fig,ax=mpl.subplots(1,2,sharex=True,sharey=True)
 #    ax[0].imshow(psf_n_2k)
@@ -372,7 +360,7 @@ def ferengi_clip_edge(image,auto_frac=2,clip_also=None,norm=False):#TBD
     if np.size(i)>0:
         lim = np.min(r[i])
         if np.size(i)>new_nrej*3:
-            print 'Large gap?'
+            print('Large gap?')
         npix = round(N/2.0-lim)
         
         if clip_also is not None:
@@ -638,7 +626,7 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
     
     img_downscale = ferengi_convolve_plus_noise(img_downscale/highz_info['exptime'],psf_t,sky,highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
     if np.amax(img_downscale) == -99:
-        print 'Sky Image not big enough!'
+        print('Sky Image not big enough!')
         return -99,-99
 
 ##    import matplotlib.pyplot as mpl
@@ -660,9 +648,10 @@ if __name__=='__main__':
     
     import time as t
     t0=t.time()
+
 #    imOUT,psfOUT = ferengi(InputImName,BgName,lowz_info,highz_info,['smooth_galpy_evo.fits','smooth_psfpy_evo.fits'],noconv=False,evo=lum_evolution)
     imOUT,psfOUT = ferengi(InputImName,BgName,lowz_info,highz_info,['smooth_galpy.fits','smooth_psfpy.fits'],noconv=False,evo=None)
-    print 'elapsed %.6f secs'%(t.time()-t0)
+    print('elapsed %.6f secs'%(t.time()-t0))
 
 #    fig,ax=mpl.subplots(1,2)
 #    ax[0].imshow(imOUT)

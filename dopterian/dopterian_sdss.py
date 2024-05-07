@@ -1,7 +1,7 @@
-import .auxiliary_functions_sdss as afs
+from . import auxiliary_functions_sdss as afs
 import warnings
 import argparse
-import .dopterian
+from . import dopterian
 
 def lum_evolution(zlow,zhigh):
     "Defined Luminosity evolution from L* of Sobral et al. 2013."
@@ -179,7 +179,7 @@ if __name__=='__main__':
 
 
             SExcatalog[k].write('%s\t%10.4f\t%10.4f\t%10.4f\t%10.4f\t%10.4f\t%10.4f\t%10.4f\t%10.4f\n'%(Info_Table['ID'][i],xs[num],ys[num],mag[num]+mcorr,re[num],n[num],e[num],t[num],sep))
-            print 'SEx Pars',xs[num],ys[num],mag[num]+mcorr,re[num],n[num],e[num],t[num]                                         
+            print('SEx Pars',xs[num],ys[num],mag[num]+mcorr,re[num],n[num],e[num],t[num] )                                        
     
 ##            if sep >10:
 ##                print "No galaxy detected at X,Y=center,center"
@@ -189,7 +189,7 @@ if __name__=='__main__':
 ##                continue
     
             if sep==-99.0:
-                print "Nothing detected in stamp image"
+                print("Nothing detected in stamp image")
                 table[k].write('%s\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\t-99.0000\n'%(Info_Table['ID'][i]))
                 afs.sp.call('rm %s/mask_z%.3f.fits'%(path,highz),shell=True)
                 continue
@@ -212,7 +212,7 @@ if __name__=='__main__':
             afs.sp.call('galfit galfit_file_z%.3f >> galfit.log'%(highz),shell=True,stderr=afs.sp.PIPE)
 #            sp.call('galfit galfit_file%i_z%.3f'%(runtype,highz),shell=True)
             X,Y,MAG,R,S,Q,T,CHI,F=afs.read_results_file('%s/result_z%.3f.fits'%(path,highz))
-            print 'GALFIT Pars',X,Y,MAG,R,S,Q,T,CHI,F                                          
+            print('GALFIT Pars',X,Y,MAG,R,S,Q,T,CHI,F)                                         
 
             table[k].write('%s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%i\t%3.2f\n'%(Info_Table['ID'][i],X,Y,MAG,R,S,Q,T,CHI,F,sep))
             
@@ -225,7 +225,7 @@ if __name__=='__main__':
             
         afs.sp.call('rm %s/dopterian*.fits %s/stamp_z*.fits %s/result_z*.fits %s/psf_z*.fits galfit_objects.temp galfit_file_z* galfit.* fit.log %s/mask_z*.fits'%(path,path,path,path,path),shell=True)
 
-        print "--------------> Done with galaxy %s \n"%Info_Table['ID'][i]
+        print("--------------> Done with galaxy %s \n"%Info_Table['ID'][i])
 
     [SExcatalog[k1].close() for k1 in range(len(redshifts))]
     [table[k1].close() for k1 in range(len(redshifts))]
