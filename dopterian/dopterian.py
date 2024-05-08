@@ -5,15 +5,15 @@ import scipy.optimize as scopt
 import scipy.ndimage as scndi
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as mpl
-import cosmology as cosmos
+from astropy.cosmology import FlatLambdaCDM
 import astropy.modeling as apmodel
 import astropy.convolution as apcon
 import warnings
 
-#==============================================================================
+#=====================================================================f=========
 #  CONSTANTS
 #==============================================================================
-version = '1.0.0'
+version = '1.0.0'   
 
 c = 299792458. ## speed of light
 
@@ -441,9 +441,11 @@ def lum_evolution(zlow,zhigh):
     return luminosity(zhigh)/luminosity(zlow)
 
 def ferengi_downscale(image_low,z_low,z_high,pix_low,pix_hi,upscale=False,nofluxscale=False,evo=None):
-
-    da_in = cosmos.angular_distance(z_low)
-    da_out = cosmos.angular_distance(z_high)
+    cosmos = FlatLambdaCDM(H0=70, Om0=0.3)
+    da_in = cosmos.angular_diameter_distance(z_low)
+    da_out = cosmos.angular_diameter_distance(z=z_high)
+    
+    
     
     dl_in=da_in*(1+z_low)**2#cosmos.luminosity_distance(z_low)
     dl_out=da_out*(1+z_high)**2#cosmos.luminosity_distance(z_high)
@@ -489,8 +491,8 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
     psf_l = ferengi_psf_centre(psf_low)
     psf_h = ferengi_psf_centre(psf_high)
 
-    da_in = cosmos.angular_distance(z_low)
-    da_out = cosmos.angular_distance(z_high)   
+    da_in = cosmos.angular_diameter_distance(z_low)
+    da_out = cosmos.angular_diameter_distance(z_high)
     
     N,M=psf_l.shape
     add=0
