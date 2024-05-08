@@ -3,6 +3,7 @@ from astropy.io import fits
 import numpy as np
 import math
 
+#Script para probar la ejecucion de dopterian
 
 sci_image = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\clash_a209_nir_0990_dopterian_input.fits'
 psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\hlsp_clash_hst_wfc3ir-65mas_all_f160w_v1_psf.fits'
@@ -20,7 +21,7 @@ science_hdul.close()
 #exptime
 exptime = science_header['EXPTIME']
 
-#pixscale
+#pixscale (need to check if this is correct)
 CD1_1 = science_header['CD1_1']
 CD1_2 = science_header['CD1_2']
 CD2_1 = science_header['CD2_1']
