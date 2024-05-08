@@ -467,9 +467,9 @@ def ferengi_downscale(image_low,z_low,z_high,pix_low,pix_hi,upscale=False,noflux
         lum_factor=1.0
         
     N,M = image_low.shape
-
-    N_out = int(round(N*mag_factor))
-    M_out = int(round(M*mag_factor))
+    
+    N_out = int(round(N * mag_factor.value))
+    M_out = int(round(M * mag_factor.value))
 
     img_out = rebin2d(image_low,N_out,M_out,flux_scale=True)*lum_factor*evo_fact
 
@@ -487,7 +487,7 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
     """ Compute the transformation psf. Psf_low and psf_high are the low and high redshift PSFs respectively.
     Also needed as input paramenters the redshifts (low and high) and pixelscales (low and high).
     """    
-    
+    cosmos = FlatLambdaCDM(H0=70, Om0=0.3)
     psf_l = ferengi_psf_centre(psf_low)
     psf_h = ferengi_psf_centre(psf_high)
 
