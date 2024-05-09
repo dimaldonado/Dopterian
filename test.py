@@ -21,14 +21,10 @@ science_hdul.close()
 #exptime
 exptime = science_header['EXPTIME']
 
-#pixscale (need to check if this is correct)
-CD1_1 = science_header['CD1_1']
-CD1_2 = science_header['CD1_2']
-CD2_1 = science_header['CD2_1']
-CD2_2 = science_header['CD2_2']
+#pixscale 
 
-pixscale = math.sqrt(CD1_1**2 + CD2_2**2)
-
+pixscale =  0.065
+ 
 #input_photflam and input_photplam
 
 input_photflam = science_header['PHOTFLAM']
