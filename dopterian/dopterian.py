@@ -215,7 +215,7 @@ def ring_sky(image,width0,nap,x=None,y=None,q=1,pa=0,rstart=None,nw=None):
 
 def ferengi_make_psf_same(psf1,psf2):
     "Compares the size of both psf images and zero-pads the smallest one so that they have the same size"
-    
+    #print(psf2.shape)
     if np.size(psf1)>np.size(psf2):
         case=True
         big=psf1
@@ -228,12 +228,11 @@ def ferengi_make_psf_same(psf1,psf2):
     Nb,Mb=big.shape
     Ns,Ms=small.shape
     
-    center = Nb/2
-    small_side = Ns/2
-    
+    center = int(np.floor(Nb/2))#revisar
+    small_side = int(np.floor(Ns/2))#revisar
+    print(center,small_side)
     new_small=np.zeros(big.shape)
     new_small[center-small_side:center+small_side+1,center-small_side:center+small_side+1]=small
-    
     if case==True:
         return psf1,new_small
     else:
@@ -303,7 +302,7 @@ def ferengi_deconvolve(wide,narrow):#TBD
     
     print('Requested PSF array is larger than 2x2k!')
     
-#    fig,ax=mpl.subplots(1,2,sharex=True,sharey=True)
+    fig,ax=mpl.subplots(1,2,sharex=True,sharey=True)
 #    ax[0].imshow(psf_n_2k)
 #    ax[1].imshow(psf_w_2k)
 #    mpl.show()
@@ -485,35 +484,44 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
     """ Compute the transformation psf. Psf_low and psf_high are the low and high redshift PSFs respectively.
     Also needed as input paramenters the redshifts (low and high) and pixelscales (low and high).
     """    
+
     psf_l = ferengi_psf_centre(psf_low)
     psf_h = ferengi_psf_centre(psf_high)
+    print("1.  psf_l: "+str(psf_l.shape)+"psf_h"+str(psf_h.shape))
 
     da_in = WMAP9.angular_diameter_distance(z_low)
     da_out = WMAP9.angular_diameter_distance(z_high)
-    
+
     N,M=psf_l.shape
     add=0
+    out_size = round((da_in.value/da_out.value)*(pix_low/pix_high)*(N+add))
     
-    out_size = round((da_in/da_out)*(pix_low/pix_high)*(N+add))
     
     while out_size%2==0:
         add+=2
         psf_l=np.pad(psf_l,1,mode='constant')
-        out_size = round((da_in/da_out)*(pix_low/pix_high)*(N+add))
+        out_size = round((da_in.value/da_out.value)*(pix_low/pix_high)*(N+add))
         if add>N*3:
             return -99
 ##            raise ValueError('Enlarging PSF failed!')
     
+   
     psf_l = ferengi_downscale(psf_l,z_low,z_high,pix_low,pix_high,nofluxscale=True)
+    
     psf_l = ferengi_psf_centre(psf_l)
+    
     
 
 # Make the psfs the same size (then center)
+    print("2.      psf_l: "+str(psf_l.shape)+"psf_h: "+str(psf_h.shape))
     psf_l,psf_h=ferengi_make_psf_same(psf_l,psf_h)  
+    
+    print("3.      psf_l: "+str(psf_l.shape)+"psf_h: "+str(psf_h.shape))
 
 
     psf_l = ferengi_psf_centre(psf_l)
     psf_h = ferengi_psf_centre(psf_h)
+    print("hola")
     
 
 # NORMALIZATION    
