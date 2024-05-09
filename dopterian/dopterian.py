@@ -5,7 +5,7 @@ import scipy.optimize as scopt
 import scipy.ndimage as scndi
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as mpl
-from astropy.cosmology import FlatLambdaCDM
+from astropy.cosmology import WMAP9
 import astropy.modeling as apmodel
 import astropy.convolution as apcon
 import warnings
@@ -441,11 +441,9 @@ def lum_evolution(zlow,zhigh):
     return luminosity(zhigh)/luminosity(zlow)
 
 def ferengi_downscale(image_low,z_low,z_high,pix_low,pix_hi,upscale=False,nofluxscale=False,evo=None):
-    cosmos = FlatLambdaCDM(H0=70, Om0=0.3)
-    da_in = cosmos.angular_diameter_distance(z_low)
-    da_out = cosmos.angular_diameter_distance(z=z_high)
-    
-    
+    da_in = WMAP9.angular_diameter_distance(z_low)
+    da_out = WMAP9.angular_diameter_distance(z=z_high)
+
     
     dl_in=da_in*(1+z_low)**2#cosmos.luminosity_distance(z_low)
     dl_out=da_out*(1+z_high)**2#cosmos.luminosity_distance(z_high)
@@ -487,12 +485,11 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
     """ Compute the transformation psf. Psf_low and psf_high are the low and high redshift PSFs respectively.
     Also needed as input paramenters the redshifts (low and high) and pixelscales (low and high).
     """    
-    cosmos = FlatLambdaCDM(H0=70, Om0=0.3)
     psf_l = ferengi_psf_centre(psf_low)
     psf_h = ferengi_psf_centre(psf_high)
 
-    da_in = cosmos.angular_diameter_distance(z_low)
-    da_out = cosmos.angular_diameter_distance(z_high)
+    da_in = WMAP9.angular_diameter_distance(z_low)
+    da_out = WMAP9.angular_diameter_distance(z_high)
     
     N,M=psf_l.shape
     add=0
