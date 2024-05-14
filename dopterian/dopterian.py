@@ -5,10 +5,11 @@ import scipy.optimize as scopt
 import scipy.ndimage as scndi
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as mpl
-from astropy.cosmology import WMAP9
+from . import cosmology as cosmos 
 import astropy.modeling as apmodel
 import astropy.convolution as apcon
 import warnings
+import matplotlib.pyplot as plt
 
 #=====================================================================f=========
 #  CONSTANTS
@@ -298,11 +299,22 @@ def ferengi_deconvolve(wide,narrow):#TBD
     "Images should have the same size. PSFs must be centered (odd pixel numbers) and normalized."
 
     Nn,Mn=narrow.shape #Assumes narrow and wide have the same shape
+
+    smax = max(Nn,Mn) 
+    bigsz=2    
+    while bigsz<smax:
+        bigsz*=2
+
+    if bigsz>2048:
+        print('Requested PSF array is larger than 2x2k!')
     
+    psf_n_2k = np.zeros([bigsz,bigsz],dtype=np.double)
+    psf_w_2k = np.zeros([bigsz,bigsz],dtype=np.double)
     
-    print('Requested PSF array is larger than 2x2k!')
+    psf_n_2k[0:Nn,0:Mn]=narrow
+    psf_w_2k[0:Nn,0:Mn]=wide
     
-    fig,ax=mpl.subplots(1,2,sharex=True,sharey=True)
+#    fig,ax=mpl.subplots(1,2,sharex=True,sharey=True)
 #    ax[0].imshow(psf_n_2k)
 #    ax[1].imshow(psf_w_2k)
 #    mpl.show()
@@ -312,26 +324,38 @@ def ferengi_deconvolve(wide,narrow):#TBD
     fft_n = np.fft.fft2(psf_n_2k)
     fft_w = np.fft.fft2(psf_w_2k)
     
-    del psf_n_2k,psf_w_2k
     fft_n = np.absolute(fft_n)/(np.absolute(fft_n)+0.000000001)*fft_n
     fft_w = np.absolute(fft_w)/(np.absolute(fft_w)+0.000000001)*fft_w
     
     psf_ratio = fft_w/fft_n
 
-    del fft_n,fft_w
     
 #    Create Transformation PSF
     psf_intermed = np.real(np.fft.fft2(psf_ratio))
     psf_corr = np.zeros(narrow.shape,dtype=np.double)
-    lo = bigsz-Nn/2
-    hi=Nn/2
+    lo = bigsz-Nn//2
+    hi=Nn//2
     psf_corr[0:hi,0:hi]=psf_intermed[lo:bigsz,lo:bigsz]    
     psf_corr[hi:Nn-1,0:hi]=psf_intermed[0:hi,lo:bigsz]    
     psf_corr[hi:Nn-1,hi:Nn-1]=psf_intermed[0:hi,0:hi]    
     psf_corr[0:hi,hi:Nn-1]=psf_intermed[lo:bigsz,0:hi]        
-    del psf_intermed
+    
     
     psf_corr = np.rot90(psf_corr,2)
+
+    '''
+    plt.figure()
+    plt.imshow(psf_corr/np.sum(psf_corr), cmap='gray')
+    plt.title('psf_corr')
+    plt.colorbar()
+
+    plt.figure()
+    plt.imshow(ferengi_psf_centre(psf_corr/np.sum(psf_corr)), cmap='gray')
+    plt.title('psf_corr_centre')
+    plt.colorbar()
+    plt.show()
+    '''
+    
     return psf_corr/np.sum(psf_corr)
     
 def ferengi_clip_edge(image,auto_frac=2,clip_also=None,norm=False):#TBD
@@ -440,8 +464,8 @@ def lum_evolution(zlow,zhigh):
     return luminosity(zhigh)/luminosity(zlow)
 
 def ferengi_downscale(image_low,z_low,z_high,pix_low,pix_hi,upscale=False,nofluxscale=False,evo=None):
-    da_in = WMAP9.angular_diameter_distance(z_low)
-    da_out = WMAP9.angular_diameter_distance(z=z_high)
+    da_in = cosmos.angular_distance(z_low)
+    da_out = cosmos.angular_distance(z=z_high)
 
     
     dl_in=da_in*(1+z_low)**2#cosmos.luminosity_distance(z_low)
@@ -465,8 +489,8 @@ def ferengi_downscale(image_low,z_low,z_high,pix_low,pix_hi,upscale=False,noflux
         
     N,M = image_low.shape
     
-    N_out = int(round(N * mag_factor.value))
-    M_out = int(round(M * mag_factor.value))
+    N_out = int(round(N * mag_factor))
+    M_out = int(round(M * mag_factor))
 
     img_out = rebin2d(image_low,N_out,M_out,flux_scale=True)*lum_factor*evo_fact
 
@@ -489,18 +513,18 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
     psf_h = ferengi_psf_centre(psf_high)
     print("1.  psf_l: "+str(psf_l.shape)+"psf_h"+str(psf_h.shape))
 
-    da_in = WMAP9.angular_diameter_distance(z_low)
-    da_out = WMAP9.angular_diameter_distance(z_high)
+    da_in = cosmos.angular_distance(z_low)
+    da_out = cosmos.angular_distance(z_high)
 
     N,M=psf_l.shape
     add=0
-    out_size = round((da_in.value/da_out.value)*(pix_low/pix_high)*(N+add))
+    out_size = round((da_in/da_out)*(pix_low/pix_high)*(N+add))
     
     
     while out_size%2==0:
         add+=2
         psf_l=np.pad(psf_l,1,mode='constant')
-        out_size = round((da_in.value/da_out.value)*(pix_low/pix_high)*(N+add))
+        out_size = round((da_in/da_out)*(pix_low/pix_high)*(N+add))
         if add>N*3:
             return -99
 ##            raise ValueError('Enlarging PSF failed!')
@@ -521,12 +545,26 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
 
     psf_l = ferengi_psf_centre(psf_l)
     psf_h = ferengi_psf_centre(psf_h)
-    print("hola")
+    
     
 
 # NORMALIZATION    
     psf_l/=np.sum(psf_l)
     psf_h/=np.sum(psf_h)
+    
+ # Mostrar psf_l
+    """
+    plt.figure()
+    plt.imshow(psf_l, cmap='gray')
+    plt.title('psf_l')
+    plt.colorbar()
+# Mostrar psf_h
+    plt.figure()
+    plt.imshow(psf_h, cmap='gray')
+    plt.title('psf_h')
+    plt.colorbar()
+    """
+    #plt.show()
 
     return psf_l,psf_h,ferengi_psf_centre(ferengi_deconvolve(psf_h,psf_l))
 
@@ -554,7 +592,7 @@ def ferengi_convolve_plus_noise(image,psf,sky,exptime,nonoise=False,border_clip=
     if nonoise==False:
         ef= Nout%2
         try:
-            out+=sky[Nsky/2-Nout/2:Nsky/2+Nout/2+ef,Msky/2-Mout/2:Msky/2+Mout/2+ef]+\
+            out+=sky[Nsky//2-Nout//2:Nsky//2+Nout//2+ef,Msky//2-Mout//2:Msky//2+Mout//2+ef]+\
                  np.sqrt(np.abs(out*exptime))*npr.normal(size=out.shape)/exptime
         except ValueError:
 ##            raise ValueError('Sky Image not big enough!')
@@ -575,8 +613,8 @@ def dump_results(image,psf,imgname_in,bgimage_in,names_out,lowz_info,highz_info)
     hdr_img['comment']='Using ferengi.py version %s'%version
     for key in highz_info.keys():
         hdr_img['%s_o'%key[:4]]=(highz_info[key],'%s value for input highz object'%(key))
-    hdu.writeto(name_imout,clobber=True)
-    pyfits.writeto(name_psfout,psf,clobber=True)
+    hdu.writeto(name_imout,overwrite=True)
+    pyfits.writeto(name_psfout,psf,overwrite=True)
     return
     
 def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,border_clip=3):
@@ -585,6 +623,8 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
     Ph=pyfits.getdata(highz_info['psf'])
     sky=pyfits.getdata(background)
     image=pyfits.getdata(imgname)
+
+    
     if imerr is None:
         imerr=1/np.sqrt(np.abs(image))
     else:
@@ -598,6 +638,8 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
 
         psf_low = Pl
         psf_hi = Ph
+    
+
 
     
     median = scndi.median_filter(img_downscale,3)
@@ -618,6 +660,7 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
 
     try:
         psf_low,psf_high,psf_t = ferengi_transformation_psf(psf_low,psf_hi,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'])
+        
     except TypeError as err:
         print('Enlarging PSF failed! Skipping Galaxy.')
         return -99,-99
