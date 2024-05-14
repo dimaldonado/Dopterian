@@ -70,7 +70,7 @@ plt.colorbar()
 
 
 #ejecutamos dopterian
-imOUT, psfOUT = dopt.ferengi(sci_image,sky_image, lowz_info, highz_info, [output_sci, output_psf], imerr=None, noconv=False, evo=None)
+imOUT, psfOUT = dopt.ferengi(sci_image,sky_image, lowz_info, highz_info, [output_sci, output_psf], imerr=None, noconv=False, evo=None, nonoise=True)
 
 #graficamos las imagenes de salida
 plt.figure()
