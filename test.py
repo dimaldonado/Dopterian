@@ -15,6 +15,10 @@ output_psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Output\hlsp_clash_
 
 #leemos los fits
 
+science_hdul = fits.open(sky_image)
+sky_data = science_hdul[0].data
+science_hdul.close()
+
 science_hdul = fits.open(psf)
 psf_data = science_hdul[0].data
 science_hdul.close()
@@ -47,14 +51,21 @@ lowz_info  = {'redshift': 0.206, 'psf': psf,'zp': zero_point, 'exptime': exptime
 highz_info  = {'redshift': 2.0, 'psf': psf,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale}
 
 #graficamos las imagenes de entrada
+
+plt.figure()
+plt.imshow(sky_data, cmap='gray')
+plt.title('Sky Data Input')
+plt.colorbar()
+
+
 plt.figure()
 plt.imshow(science_data, cmap='gray')
-plt.title('science_data')
+plt.title('Science Data Input')
 plt.colorbar()
 
 plt.figure()
 plt.imshow(psf_data, cmap='gray')
-plt.title('psf_data')
+plt.title('Psf Data Input')
 plt.colorbar()
 
 

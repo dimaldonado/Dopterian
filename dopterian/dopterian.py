@@ -216,7 +216,7 @@ def ring_sky(image,width0,nap,x=None,y=None,q=1,pa=0,rstart=None,nw=None):
 
 def ferengi_make_psf_same(psf1,psf2):
     "Compares the size of both psf images and zero-pads the smallest one so that they have the same size"
-    #print(psf2.shape)
+
     if np.size(psf1)>np.size(psf2):
         case=True
         big=psf1
@@ -231,7 +231,6 @@ def ferengi_make_psf_same(psf1,psf2):
     
     center = int(np.floor(Nb/2))#revisar
     small_side = int(np.floor(Ns/2))#revisar
-    print(center,small_side)
     new_small=np.zeros(big.shape)
     new_small[center-small_side:center+small_side+1,center-small_side:center+small_side+1]=small
     if case==True:
@@ -511,7 +510,6 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
 
     psf_l = ferengi_psf_centre(psf_low)
     psf_h = ferengi_psf_centre(psf_high)
-    print("1.  psf_l: "+str(psf_l.shape)+"psf_h"+str(psf_h.shape))
 
     da_in = cosmos.angular_distance(z_low)
     da_out = cosmos.angular_distance(z_high)
@@ -531,40 +529,18 @@ def ferengi_transformation_psf(psf_low,psf_high,z_low,z_high,pix_low,pix_high,sa
     
    
     psf_l = ferengi_downscale(psf_l,z_low,z_high,pix_low,pix_high,nofluxscale=True)
-    
     psf_l = ferengi_psf_centre(psf_l)
-    
-    
 
 # Make the psfs the same size (then center)
-    print("2.      psf_l: "+str(psf_l.shape)+"psf_h: "+str(psf_h.shape))
     psf_l,psf_h=ferengi_make_psf_same(psf_l,psf_h)  
-    
-    print("3.      psf_l: "+str(psf_l.shape)+"psf_h: "+str(psf_h.shape))
-
-
     psf_l = ferengi_psf_centre(psf_l)
     psf_h = ferengi_psf_centre(psf_h)
     
     
-
 # NORMALIZATION    
     psf_l/=np.sum(psf_l)
     psf_h/=np.sum(psf_h)
     
- # Mostrar psf_l
-    """
-    plt.figure()
-    plt.imshow(psf_l, cmap='gray')
-    plt.title('psf_l')
-    plt.colorbar()
-# Mostrar psf_h
-    plt.figure()
-    plt.imshow(psf_h, cmap='gray')
-    plt.title('psf_h')
-    plt.colorbar()
-    """
-    #plt.show()
 
     return psf_l,psf_h,ferengi_psf_centre(ferengi_deconvolve(psf_h,psf_l))
 
