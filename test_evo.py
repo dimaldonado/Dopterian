@@ -50,8 +50,10 @@ lowz_info  = {'redshift': 0.206, 'psf': psf,'zp': zero_point, 'exptime': exptime
 
 highz_info  = {'redshift': 2.0, 'psf': psf,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale}
 
-#graficamos las imagenes de entrada
+print(science_data.ndim)
 
+#graficamos las imagenes de entrada
+''''
 plt.figure()
 plt.imshow(sky_data, cmap='gray')
 plt.title('Sky Data Input')
@@ -67,19 +69,41 @@ plt.figure()
 plt.imshow(psf_data, cmap='gray')
 plt.title('Psf Data Input')
 plt.colorbar()
+'''
+'''
+# Lista para almacenar las imágenes de salida
+imOUT_list = []
 
+# Ejecutamos dopterian con evo=None y almacenamos el resultado
+imOUT, psfOUT = dopt.ferengi(sci_image, sky_image, lowz_info, highz_info, [output_sci, output_psf], imerr=None, noconv=False, evo=None, nonoise=True, extend=False, noflux=True)
+imOUT_list.append(('evo=lum_factor()', imOUT))
 
-#ejecutamos dopterian
-imOUT, psfOUT = dopt.ferengi(sci_image,sky_image, lowz_info, highz_info, [output_sci, output_psf], imerr=None, noconv=False, evo=None, nonoise=True)
+# Ejecutamos dopterian con evo desde -1 hasta 1 en saltos de 0.1
+for evo in np.arange(-1, 1.1, 0.1):
+    imOUT, psfOUT = dopt.ferengi(sci_image, sky_image, lowz_info, highz_info, [output_sci, output_psf], imerr=None, noconv=False, evo=evo, nonoise=True, extend=False, noflux=True)
+    imOUT_list.append((f'evo={evo:.1f}', imOUT))
 
-#graficamos las imagenes de salida
-plt.figure()
-plt.imshow(imOUT, cmap='gray')
-plt.title('imOUT')
-plt.colorbar()
+# Encontramos los valores mínimos y máximos para todas las imágenes
+vmin = min(im[1].min() for im in imOUT_list)
+vmax = max(im[1].max() for im in imOUT_list)
 
-plt.figure()
-plt.imshow(psfOUT, cmap='gray')
-plt.title('psfOUT')
-plt.colorbar()
+# Crear una figura y ejes para todas las imágenes
+ncols = 5  # Número de columnas para la cuadrícula
+nrows = int(np.ceil(len(imOUT_list) / ncols))  # Calculamos el número de filas
+fig, axs = plt.subplots(nrows, ncols, figsize=(20, 4 * nrows))
+
+# Graficamos las imágenes de salida en los subplots
+for ax, (title, imOUT) in zip(axs.flat, imOUT_list):
+    im = ax.imshow(imOUT, cmap='gray', vmin=vmin, vmax=vmax)
+     
+    ax.set_title(title)
+    
+    fig.colorbar(im, ax=ax)
+
+# Eliminar los ejes vacíos si el número de subplots es mayor que el número de imágenes
+for ax in axs.flat[len(imOUT_list):]:
+    fig.delaxes(ax)
+
+plt.tight_layout()
 plt.show()
+'''

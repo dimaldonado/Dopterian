@@ -467,24 +467,27 @@ def ferengi_downscale(image_low,z_low,z_high,pix_low,pix_hi,upscale=False,noflux
     da_out = cosmos.angular_distance(z=z_high)
 
     
-    dl_in=da_in*(1+z_low)**2#cosmos.luminosity_distance(z_low)
-    dl_out=da_out*(1+z_high)**2#cosmos.luminosity_distance(z_high)
+    dl_in=cosmos.luminosity_distance(z_low)
+    dl_out=cosmos.luminosity_distance(z_high)
+   
     
     if evo is not None:
-##        evo_fact = evo(z_low,z_high)
-        evo_fact = evo(0.0,z_high) ### UPDATED TO MATCH FERENGI ALGORITHM
-    else:
-        evo_fact=1.0
         
+        evo_fact = 10 ** (-0.4 * evo * z_high) ### UPDATED TO MATCH FERENGI ALGORITHM numeros negativos entre 0 y -1
+    else:
+        #evo_fact = lum_evolution(z_low,z_high)
+        evo_fact = 1.0
     mag_factor = (da_in/da_out)*(pix_low/pix_hi)
     if upscale == True:
-        mag_factor=1./mag_factor
+        mag_factor=1.0/mag_factor
     
 ##    lum_factor = (dl_in/dl_out)**2
     lum_factor = (dl_in/dl_out)**2*(1.+z_high)/(1.+z_low) ### UPDATED TO MATCH FERENGI ALGORITHM
         
     if nofluxscale==True:
         lum_factor=1.0
+    else:
+        lum_factor =(da_in/da_out)**2
         
     N,M = image_low.shape
     
@@ -568,8 +571,7 @@ def ferengi_convolve_plus_noise(image,psf,sky,exptime,nonoise=False,border_clip=
     if nonoise==False:
         ef= Nout%2
         try:
-            out+=sky[Nsky//2-Nout//2:Nsky//2+Nout//2+ef,Msky//2-Mout//2:Msky//2+Mout//2+ef]+\
-                 np.sqrt(np.abs(out*exptime))*npr.normal(size=out.shape)/exptime
+            out+=sky[Nsky//2-Nout//2:Nsky//2+Nout//2+ef,Msky//2-Mout//2:Msky//2+Mout//2+ef]+np.sqrt(np.abs(out*exptime))*npr.normal(size=out.shape)/exptime
         except ValueError:
 ##            raise ValueError('Sky Image not big enough!')
             return -99*np.ones(out.shape)
@@ -607,6 +609,9 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
         imerr=pyfits.getdata(imerr)
     
     if kcorrect:
+        #primero debemos aplicar ferengi downscale a todas las bandas de la entrada
+
+        # luego ferengi downscale a imerr
         raise NotImplementedError('K-corrections are not implemented yet')
     else:
         img_nok = maggies2cts(cts2maggies(image,lowz_info['exptime'],lowz_info['zp']),highz_info['exptime'],highz_info['zp'])#*1000.
