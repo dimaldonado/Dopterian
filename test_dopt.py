@@ -36,6 +36,7 @@ filters= [
 input_image_list = []
 output_image_list = []
 data_list = []
+
 # Procesar cada fila del catálogo
 for i in range(len(catalog_path)):
     
@@ -54,7 +55,9 @@ for i in range(len(catalog_path)):
         rms_filename = f"RMS_{filters[i]}W_{base_filename}"
         sci_filename = f"SCI_{filters[i]}W_{base_filename}"
 
-        print(sci_filename)
+        print(sci_filename+"------------------------------------")
+        print(sky_filename)
+        print(rms_filename)
 
         
         sky_fits_path = os.path.join('D:/Documentos/Diego/U/Memoria Titulo/Dopterian/Input/A209/', sky_filename)
@@ -66,6 +69,7 @@ for i in range(len(catalog_path)):
         sky_ok = False
         rms_ok = False
         sci_ok = False
+
         try:
             with fits.open(sky_fits_path) as hdul:
                 sky_data = hdul[0].data
@@ -127,7 +131,7 @@ for i in range(len(catalog_path)):
 
             input_image_list.append(science_data)
             data_list.append(sci_filename+"  z:"+str(zb_1))
-            imOUT, psfOUT = dopt.ferengi(sci_fits_path, sky_fits_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_fits_path ,noflux=False,evo=None, noconv=False, kcorrect=False, extend=False, nonoise=True,)
+            imOUT, psfOUT = dopt.ferengi(sci_fits_path, sky_fits_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_fits_path ,noflux=False,evo=None, noconv=False, kcorrect=False, extend=False, nonoise=True)
             output_image_list.append(imOUT)
 
             fig, axs = plt.subplots(1, 2, figsize=(10, 5))

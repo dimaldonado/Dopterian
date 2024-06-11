@@ -70,7 +70,7 @@ plt.imshow(psf_data, cmap='gray')
 plt.title('Psf Data Input')
 plt.colorbar()
 '''
-'''
+
 # Lista para almacenar las imágenes de salida
 imOUT_list = []
 
@@ -106,4 +106,3 @@ for ax in axs.flat[len(imOUT_list):]:
 
 plt.tight_layout()
 plt.show()
-'''

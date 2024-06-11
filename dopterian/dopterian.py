@@ -11,6 +11,7 @@ import astropy.convolution as apcon
 import warnings
 import matplotlib.pyplot as plt
 
+
 #=====================================================================f=========
 #  CONSTANTS
 #==============================================================================
@@ -602,7 +603,6 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
     sky=pyfits.getdata(background)
     image=pyfits.getdata(imgname)
 
-    
     if imerr is None:
         imerr=1/np.sqrt(np.abs(image))
     else:
@@ -622,7 +622,219 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
     
 
 
+
+    median = scndi.median_filter(img_downscale,3)
+    idx = np.where(np.isfinite(img_downscale)==False)
+    img_downscale[idx]=median[idx]
     
+    idx = np.where(img_downscale==0.0)
+    img_downscale[idx]=median[idx]
+    
+    X=img_downscale.shape[0]*0.5
+    Y=img_downscale.shape[1]*0.5 ## To be improved
+    
+    img_downscale-=ring_sky(img_downscale, 50,15,x=X,y=Y,nw=True)
+    
+    if noconv==True:
+        dump_results(img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low),imgname,background,namesout,lowz_info,highz_info)
+        return img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low)
+
+    try:
+        psf_low,psf_high,psf_t = ferengi_transformation_psf(psf_low,psf_hi,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'])
+        
+    except TypeError as err:
+        print('Enlarging PSF failed! Skipping Galaxy.')
+        return -99,-99
+
+    try:
+        recon_psf = ferengi_psf_centre(apcon.convolve_fft(psf_low,psf_t))
+    except ZeroDivisionError as err:
+        print('Reconstrution PSF failed!')
+        return -99,-99
+##    pyfits.writeto('transform_psf_dopterian.fits',psf_t,clobber=True)
+    
+    recon_psf/=np.sum(recon_psf)
+    
+    img_downscale = ferengi_convolve_plus_noise(img_downscale/highz_info['exptime'],psf_t,sky,highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
+    if np.amax(img_downscale) == -99:
+        print('Sky Image not big enough!')
+        return -99,-99
+    
+
+
+    dump_results(img_downscale,recon_psf,imgname,background,namesout,lowz_info,highz_info)
+    return img_downscale,recon_psf
+
+
+def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,border_clip=3):
+
+    #image , background, lowz_info['psf'], highz_info['psf'], imerr listas con los los path de los archivos, deben tener el mismo numero de entradas
+
+
+    if (len(images) != len(background) != len(lowz_info['psf']) != len(highz_info['psf'])):
+        raise ValueError('All input lists must have the same number of entries')
+        return -99,-99
+
+    n_bands = len(images)
+
+    if n_bands == 1:
+        nok = True
+    else:
+        nok = False
+
+    Pl = []
+    Ph = []
+    sky = []
+    image = []
+    im_err = []
+
+    if lowz_info['lambda'] is not None:
+        lambda_lo = np.array(lowz_info['lambda'])
+    if highz_info['lambda'] is not None:
+        lambda_hi = np.array(highz_info['lambda'])
+
+    for i in range(n_bands):
+        temp = pyfits.getdata(images[i])
+        image.append(temp)
+        Pl.append(pyfits.getdata(lowz_info['psf'][i]))
+        Ph.append(pyfits.getdata(highz_info['psf'][i]))
+        sky.append(pyfits.getdata(background[i]))
+    
+    if imerr is None:
+        for i in range(n_bands):
+            im_err.append(1/np.sqrt(np.abs(images[i])))
+    else:
+        for i in range(n_bands):
+            im_err.append(pyfits.getdata(imerr[i]))
+
+    
+    if nok:
+        img_nok = maggies2cts(cts2maggies(image,lowz_info['exptime'],lowz_info['zp']),highz_info['exptime'],highz_info['zp'])#*1000.
+        psf_lo = Pl[0]
+        psf_hi = Ph[0]
+    
+    else:
+        dz = np.abs(lambda_hi / lambda_lo - 1)
+        idx_bestfilt = np.argmin(dz)
+        psf_lo = Pl[idx_bestfilt]
+    
+    if nok:
+        img_downscale = ferengi_downscale(img_nok,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux)
+    else:
+        dz1 = np.abs(lambda_hi - lambda_lo)
+        ord = np.argsort(dz1)
+        weight = np.ones(n_bands)
+        if dz1[ord[0]] == 0:
+            if n_bands == 2:
+                weight[ord] = [10, 4]
+            elif n_bands == 3:
+                weight[ord] = [10, 4, 4]
+            elif n_bands >= 4:
+                weight[ord] = [10, 4, 4] + [1] * (n_bands - 3)
+        else:
+            if n_bands == 2:
+                weight[ord] = [10, 8]
+            elif n_bands == 3 or n_bands == 4:
+                weight[ord] = [10, 8] + [4] * (n_bands - 2)
+            elif n_bands > 4:
+                weight[ord] = [10, 8, 4, 4] + [1] * (n_bands - 4)
+        
+        img_downscale = []
+        imerr_downscale = []
+
+        for i in range(n_bands):
+            img_downscale.append(ferengi_downscale(image[i],lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux))
+        
+            img_downscale[i]-=ring_sky(img_downscale[i], 50,15,nw=True)
+        
+            imerr_downscale.append(ferengi_downscale(im_err[i],lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux))
+
+            imerr_downscale[i] = 2.5 / np.log(10) * imerr_downscale[i] / img_downscale[i]
+
+            img_downscale[i] = cts2maggies(img_downscale[i],lowz_info['exptime'][i],lowz_info['zp'][i])
+        
+    
+        siglim = 2
+        sig = np.zeros(n_bands) # [0,0,0,0,0]
+
+        npix = np.size(img_downscale[0])#numero pizeles de cada banda 28x28
+
+        zmin = np.abs(lambda_hi / lambda_lo - 1 - highz_info['redshift'])
+        filt_i = np.argmin(zmin)#indice del menor valor
+        nsig = np.zeros_like(img_downscale) #[[28x28],[28x28],[28x28],[28x28],[28x28]]
+        nhi = np.zeros_like(img_downscale[0])#[28x28]
+
+        for i in range(n_bands):
+            m, s, n = resistent_mean(img_downscale[i], 3)
+            sig[i] = s * np.sqrt(npix - 1 - n)# [0,0,0,0,0]
+            nsig[i] = scndi.median_filter(img_downscale[i],size=3) / sig[i]#para cada pixel de todas las bandas
+            hi = np.where(np.abs(nsig[i]) > siglim)# para cada pixel de todas las bandas
+            if hi[0].size > 0:                     # se cuenta el numero de veces
+                nhi[hi] += 1                       # que el valor de nsig es mayor a siglim
+                                                   # y se almacena su indice en hi 
+            
+         
+        #guarda los indices de los pixeles que cumplen con la condicion
+        good1 = np.where((np.abs(nsig[filt_i]) > 0.25) & (np.abs(nsig[filt_i]) <= siglim))
+
+        #selecciona el 50% de los indices de los pixeles que cumplen con la condicion
+        if good1[0].size > 0:
+            good1_indices = random_indices(round(good1[0].size * 0.5), np.arange(good1[0].size))
+            good1 = (good1[0][good1_indices], good1[1][good1_indices])
+        #selecciona los indices de los pixeles que cumplen con la condicion
+        good = np.where((nhi >= 3) & (np.abs(nsig[filt_i]) > siglim))
+        if good[0].size > 0:
+            print('3+ filters have high sigma pixels')
+        else:
+            print('Less than 3 filters have high sigma pixels')
+            good = np.where((nhi >= 2) & (np.abs(nsig[filt_i]) > siglim))
+            if good[0].size == 0:
+                print('Less than 2 filters have high sigma pixels')
+                good = np.where((nhi >= 1) & (np.abs(nsig[filt_i]) > siglim))
+                if good[0].size == 0:
+                    print('NO filter has high sigma pixels')
+                    good = np.where((nhi >= 0) & (np.abs(nsig[filt_i]) > siglim))
+        
+        #se concatenan los indices de los pixeles que cumplen con la condicion                    
+        if good1[0].size > 0:
+            good = (np.concatenate((good[0], good1[0])), np.concatenate((good[1], good1[1])))
+            combined_indices = np.vstack((good[0], good[1])).T
+            unique_indices = np.unique(combined_indices, axis=0)#se eliminan los indices repetidos
+            good = (unique_indices[:, 0], unique_indices[:, 1])
+
+        ngood = good[0].size
+        if ngood == 1 and good[0][0] == -1:
+            print('No pixels to process')
+                
+        
+        maggies = []
+        err = []
+        nsig_2d = [] 
+    
+        for i in range(ngood):
+            aux_maggies = []
+            aux_err = []
+            aux_nsig = []
+            for j in range(n_bands):
+                aux_maggies.append(img_downscale[j][good[0][i]][good[1][i]])
+                aux_err.append(imerr_downscale[j][good[0][i]][good[1][i]])  
+                aux_nsig.append(nsig[j][good[0][i]][good[1][i]])
+            maggies.append(np.array(aux_maggies))
+            nsig_2d.append(np.array(aux_nsig))
+            err.append(np.array(aux_err))
+
+        
+        for i in range(len(err)):
+            inf = np.where(~np.isfinite(err[i]))
+            if inf[0].size > 0:
+                err[i][inf] = 99999
+            err[i] = np.abs(err[i])
+            err[i] = np.where(err[i] < 99999, err[i], 99999)
+
+            
+  
+
+    '''
     median = scndi.median_filter(img_downscale,3)
     idx = np.where(np.isfinite(img_downscale)==False)
     img_downscale[idx]=median[idx]
@@ -665,6 +877,8 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
 
     dump_results(img_downscale,recon_psf,imgname,background,namesout,lowz_info,highz_info)
     return img_downscale,recon_psf
+    '''
+    return None
 
 
 
