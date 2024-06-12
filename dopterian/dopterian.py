@@ -10,7 +10,10 @@ import astropy.modeling as apmodel
 import astropy.convolution as apcon
 import warnings
 import matplotlib.pyplot as plt
-
+import kcorrect as k 
+import statsmodels.api as sm
+from astropy.cosmology import FlatLambdaCDM
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 #=====================================================================f=========
 #  CONSTANTS
@@ -114,10 +117,16 @@ def dist_ellipse(img,xc,yc,q,ang):
     dmat = np.sqrt(rX*rX+(1/(q*q))*rY*rY)
     return dmat
 
+def robust_linefit(x, y):
+    X = sm.add_constant(x)  # Agrega una constante para el término independiente
+    robust_model = sm.RLM(y, X, M=sm.robust.norms.HuberT())
+    results = robust_model.fit()
+    return results.params
+
 def resistent_mean(a,k):
     """Compute the mean value of an array using a k-sigma clipping method
     """
-    
+    a = np.asanyarray(a)
     media=np.nanmean(a)
     dev=np.nanstd(a)
 
@@ -666,7 +675,7 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
     return img_downscale,recon_psf
 
 
-def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,border_clip=3):
+def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=None,kc_obj=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,border_clip=3):
 
     #image , background, lowz_info['psf'], highz_info['psf'], imerr listas con los los path de los archivos, deben tener el mismo numero de entradas
 
@@ -714,13 +723,17 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
         psf_hi = Ph[0]
     
     else:
+        #select best matching PSF for output redshift
         dz = np.abs(lambda_hi / lambda_lo - 1)
         idx_bestfilt = np.argmin(dz)
         psf_lo = Pl[idx_bestfilt]
     
     if nok:
+        #scale the image down
         img_downscale = ferengi_downscale(img_nok,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux)
     else:
+
+       #weight the closest filters in rest-frame more
         dz1 = np.abs(lambda_hi - lambda_lo)
         ord = np.argsort(dz1)
         weight = np.ones(n_bands)
@@ -739,6 +752,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
             elif n_bands > 4:
                 weight[ord] = [10, 8, 4, 4] + [1] * (n_bands - 4)
         
+    
         img_downscale = []
         imerr_downscale = []
 
@@ -749,11 +763,13 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
         
             imerr_downscale.append(ferengi_downscale(im_err[i],lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux))
 
+            #convert the error from cts to mags
             imerr_downscale[i] = 2.5 / np.log(10) * imerr_downscale[i] / img_downscale[i]
 
+            #calculate the flux in each pixel (convert image from cts to maggies)
             img_downscale[i] = cts2maggies(img_downscale[i],lowz_info['exptime'][i],lowz_info['zp'][i])
         
-    
+        #siglim defines the sigma above which K-corrections are calculated
         siglim = 2
         sig = np.zeros(n_bands) # [0,0,0,0,0]
 
@@ -763,7 +779,9 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
         filt_i = np.argmin(zmin)#indice del menor valor
         nsig = np.zeros_like(img_downscale) #[[28x28],[28x28],[28x28],[28x28],[28x28]]
         nhi = np.zeros_like(img_downscale[0])#[28x28]
-
+        
+        #select the pixels above nsig with resistant_mean
+        #create a sigma map
         for i in range(n_bands):
             m, s, n = resistent_mean(img_downscale[i], 3)
             sig[i] = s * np.sqrt(npix - 1 - n)# [0,0,0,0,0]
@@ -774,14 +792,14 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
                                                    # y se almacena su indice en hi 
             
          
-        #guarda los indices de los pixeles que cumplen con la condicion
+        #from the "closest" filter select good pixels
         good1 = np.where((np.abs(nsig[filt_i]) > 0.25) & (np.abs(nsig[filt_i]) <= siglim))
 
-        #selecciona el 50% de los indices de los pixeles que cumplen con la condicion
+        #select only 50% of all pixels with 0.25 < nsig < siglim
         if good1[0].size > 0:
             good1_indices = random_indices(round(good1[0].size * 0.5), np.arange(good1[0].size))
             good1 = (good1[0][good1_indices], good1[1][good1_indices])
-        #selecciona los indices de los pixeles que cumplen con la condicion
+        
         good = np.where((nhi >= 3) & (np.abs(nsig[filt_i]) > siglim))
         if good[0].size > 0:
             print('3+ filters have high sigma pixels')
@@ -810,7 +828,8 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
         maggies = []
         err = []
         nsig_2d = [] 
-    
+
+        #setup the arrays for the pixels that are to be K-corrected
         for i in range(ngood):
             aux_maggies = []
             aux_err = []
@@ -823,14 +842,158 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,noflux=
             nsig_2d.append(np.array(aux_nsig))
             err.append(np.array(aux_err))
 
-        
-        for i in range(len(err)):
+        #remove infinite values in the error image
+        for i in range(ngood):
             inf = np.where(~np.isfinite(err[i]))
             if inf[0].size > 0:
                 err[i][inf] = 99999
             err[i] = np.abs(err[i])
             err[i] = np.where(err[i] < 99999, err[i], 99999)
+        
+        # Setup array with minimum errors for SDSS
 
+        err0 = np.tile(err0_mag, (ngood, 1))
+        wei = np.tile(weight, (ngood, 1))
+
+        #add image errors and minimum errors in quadrature
+        err = np.array(err)
+        err = np.sqrt(err0**2 + err**2)/wei
+        
+        # Convert errors from magnitudes to ivar (inverse variance)
+        ivar = (2.5 / np.log(10) / err / maggies)**2
+
+        inf = np.where(~np.isfinite(ivar))
+        if inf[0].size > 0:
+            ivar[inf] = np.max(ivar[np.isfinite(ivar)])
+
+        responses_lo = lowz_info['filter']
+        responses_hi = highz_info['filter']
+        redshift_lo = lowz_info['redshift']*np.ones(ngood)
+        redshift_hi = highz_info['redshift']*np.ones(ngood)
+
+        if kc_obj is not None:
+            
+            kc = kc_obj
+        else:
+            #kcorrect object 
+            cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
+            kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=responses_hi)
+        
+        coeffs = kc.fit_coeffs(redshift = redshift_lo,maggies = maggies,ivar = ivar)
+        k_values =  kc.kcorrect(redshift=redshift_lo, coeffs=coeffs)
+        
+        #reconstruct magnitudes in a certain filter at a certain redshift
+        r_maggies = kc.reconstruct(redshift=redshift_hi,coeffs=coeffs)
+
+        #as background choose closest in redshift-space
+        bg = img_downscale[filt_i] / (1.0 + highz_info['redshift'])
+        
+        #put in K-corrections
+        if isinstance(good, tuple) and len(good) == 2 and isinstance(good[0], np.ndarray) and isinstance(good[1], np.ndarray):
+            for i in range(ngood):
+                for j in range(n_bands):
+                    img_downscale[j][good] = r_maggies[i][j]/(1.0 + highz_info['redshift'])
+
+        #convert image back to cts
+        for i in range(n_bands):
+            img_downscale[i] = maggies2cts(img_downscale[i],highz_info['exptime'][i],highz_info['zp'][i])
+            bg = maggies2cts(bg,highz_info['exptime'][filt_i],highz_info['zp'][filt_i])
+
+    med = scndi.median_filter(img_downscale, size=3)
+    idx = np.where(~np.isfinite(img_downscale))
+    
+    #remove infinite pixels: replace with median (3x3)
+    if idx[0].size > 0:
+        img_downscale[idx] = med[idx]
+    
+    #replace 0-value pixels with median (3x3)
+    idx = np.where(img_downscale == 0)
+    if idx[0].size > 0:
+        img_downscale[idx] = med[idx]
+
+    if nok == 0:
+        m, sig, nrej = resistent_mean(img_downscale,3)
+        sig = sig * np.sqrt(np.size(img_downscale) - 1 - nrej)
+        idx = np.where(np.abs(img_downscale) > 10 * sig)
+        if idx[0].size > 0:
+            fit = robust_linefit(np.abs(bg[idx]), np.abs(img_downscale[idx]))
+            delta = np.abs(img_downscale[idx]) - (fit[0] + fit[1] * np.abs(bg[idx]))
+            
+            m, sig, nrej = resistent_mean(delta, 3)
+            sig *= np.sqrt(img_downscale.size - 1 - nrej)
+            
+            idx1 = np.where(delta / sig > 50)
+            if idx1[0].size > 0:
+                img_downscale[idx[0][idx1]] = med[idx[0][idx1]]
+
+    #subtracting sky here
+    for i in range(n_bands):
+        img_downscale[i] -= ring_sky(img_downscale[i], 50, 15, nw=True)
+    
+    if noconv==True:
+        #ump_results(img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low),imgname,background,namesout,lowz_info,highz_info)
+        #return img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low)
+        return None
+    
+    #calculate the transformation PSF
+    try:
+        psf_hi = Ph[idx_bestfilt]
+        psf_low,psf_high,psf_t = ferengi_transformation_psf(psf_lo,psf_hi,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'])
+        
+    except TypeError as err:
+        print('Enlarging PSF failed! Skipping Galaxy.')
+        return -99,-99
+
+    try:
+        recon_psf = ferengi_psf_centre(apcon.convolve_fft(psf_low,psf_t))
+    except ZeroDivisionError as err:
+        print('Reconstrution PSF failed!')
+        return -99,-99
+##    pyfits.writeto('transform_psf_dopterian.fits',psf_t,clobber=True)
+    
+    
+    #normalise reconstructed PSF
+    recon_psf/=np.sum(recon_psf)
+
+    #convolve the high redshift image with the transformation PSF
+    for i in  range(n_bands):
+        img_downscale[i] = ferengi_convolve_plus_noise(img_downscale[i]/highz_info['exptime'][i],psf_t,sky[i],highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
+        if np.amax(img_downscale[i]) == -99:
+            print('Sky Image not big enough!')
+            return -99,-99
+    
+    
+    xdim = img_downscale[0].shape[0]
+    ydim = img_downscale[0].shape[1]
+    fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
+
+    for i in range(n_bands):
+        ax = axes[i]
+        im = ax.imshow(img_downscale[i], origin='lower', cmap='gray')
+        ax.set_title("Banda: "+lowz_info['filter'][i])
+        ax.axis('off')  # Quitar los ejes para una visualización más clara
+
+        # Crear un eje para la colorbar
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+
+    # Ajustar el layout para que no se solapen los subplots
+    plt.tight_layout()
+    plt.show()
+    
+    
+
+
+
+    
+    
+    
+    return None
+
+            
+        
+        
             
   
 

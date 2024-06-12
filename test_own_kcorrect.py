@@ -43,7 +43,9 @@ psf_path_list = [
 output_sci = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F160W_clash_a209_nir_0798_output.fits'
 output_psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F160W_clash_a209_nir_0798_output_psf.fits'
 
+filter_list = ['clash_wfc3_f160w','clash_wfc3_f475w','clash_wfc3_f625w','clash_wfc3_f775w','clash_wfc3_f814w']
 lambda_lo = [15405,4770,6310,7647,8057]
+err0_mag = [0.05, 0.05, 0.05, 0.05, 0.05]
 
 img = []
 sky = []
@@ -84,10 +86,10 @@ for i in range(len(sci_path)):
 
 pixscale = 0.065
 
-lowz_info  = {'redshift': 0.194, 'psf': psf_path_list,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale,'lambda': lambda_lo}
+lowz_info  = {'redshift': 0.194, 'psf': psf_path_list,'zp': zero_point, 'exptime': exptime, 'filter': filter_list, 'lam_eff': input_photplam, 'pixscale': pixscale,'lambda': lambda_lo}
 
-highz_info  = {'redshift': 2.0, 'psf': psf_path_list,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale,'lambda': lambda_lo}
+highz_info  = {'redshift': 2.0, 'psf': psf_path_list,'zp': zero_point, 'exptime': exptime, 'filter': filter_list, 'lam_eff': input_photplam, 'pixscale': pixscale,'lambda': lambda_lo}
 
-imOUT= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, noconv=False, evo=None, nonoise=True, extend=False, noflux=True)
+imOUT= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=True, extend=False, noflux=True)
 
 
