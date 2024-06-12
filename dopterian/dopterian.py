@@ -708,6 +708,24 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
         Pl.append(pyfits.getdata(lowz_info['psf'][i]))
         Ph.append(pyfits.getdata(highz_info['psf'][i]))
         sky.append(pyfits.getdata(background[i]))
+
+    #graficar
+    xdim = image[0].shape[0]
+    ydim = image[0].shape[1]
+    fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
+    fig.suptitle('Imagen inicial', fontsize=16)
+    for i in range(n_bands):
+        ax = axes[i]
+        im = ax.imshow(image[i], origin='lower', cmap='gray')
+        ax.set_title("Banda: "+lowz_info['filter'][i])
+
+        # Crear un eje para la colorbar
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+
+    plt.tight_layout()
+    plt.show()
     
     if imerr is None:
         for i in range(n_bands):
@@ -929,6 +947,25 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     #subtracting sky here
     for i in range(n_bands):
         img_downscale[i] -= ring_sky(img_downscale[i], 50, 15, nw=True)
+
+
+    #graficar
+    xdim = img_downscale[0].shape[0]
+    ydim = img_downscale[0].shape[1]
+    fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
+    fig.suptitle('Resultado despues k-corrections, antes antes de aplicar conv', fontsize=16)
+    for i in range(n_bands):
+        ax = axes[i]
+        im = ax.imshow(img_downscale[i], origin='lower', cmap='gray')
+        ax.set_title("Banda: "+lowz_info['filter'][i])
+
+        # Crear un eje para la colorbar
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+
+    plt.tight_layout()
+    plt.show()
     
     if noconv==True:
         #ump_results(img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low),imgname,background,namesout,lowz_info,highz_info)
@@ -962,23 +999,22 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
             print('Sky Image not big enough!')
             return -99,-99
     
-    
+    #graficar
     xdim = img_downscale[0].shape[0]
     ydim = img_downscale[0].shape[1]
     fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
+    fig.suptitle('Resultado final', fontsize=16)
 
     for i in range(n_bands):
         ax = axes[i]
         im = ax.imshow(img_downscale[i], origin='lower', cmap='gray')
         ax.set_title("Banda: "+lowz_info['filter'][i])
-        ax.axis('off')  # Quitar los ejes para una visualización más clara
 
         # Crear un eje para la colorbar
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
         fig.colorbar(im, cax=cax, orientation='vertical')
 
-    # Ajustar el layout para que no se solapen los subplots
     plt.tight_layout()
     plt.show()
     
