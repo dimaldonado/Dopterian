@@ -211,14 +211,15 @@ def ring_sky(image,width0,nap,x=None,y=None,q=1,pa=0,rstart=None,nw=None):
         
         i+=1
         if np.size(flux) > nap:
-            pars,err = scopt.curve_fit(lambda x,a,b:a*x+b,r[i-nap+1:i],flux[i-nap+1:i])
-            slope=pars[0]
-            if slope>0 and nmeasures==0:
-                break
-            elif slope>0:
-                nmeasures-=1
-            else:
-                pass
+            # Filtrar valores inf y NaN
+            valid_indices = np.isfinite(r[i-nap+1:i]) & np.isfinite(flux[i-nap+1:i])
+            if np.sum(valid_indices) > 0:
+                pars, err = scopt.curve_fit(lambda x, a, b: a * x + b, r[i-nap+1:i][valid_indices], flux[i-nap+1:i][valid_indices])
+                slope = pars[0]
+                if slope > 0 and nmeasures == 0:
+                    break
+                elif slope > 0:
+                    nmeasures -= 1
 
         rhi += width
     sky = resistent_mean(flux[i-nap+1:i],3)[0]        
@@ -703,29 +704,14 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
         lambda_hi = np.array(highz_info['lambda'])
 
     for i in range(n_bands):
-        temp = pyfits.getdata(images[i])
-        image.append(temp)
+        image.append(pyfits.getdata(images[i]))
         Pl.append(pyfits.getdata(lowz_info['psf'][i]))
-        Ph.append(pyfits.getdata(highz_info['psf'][i]))
         sky.append(pyfits.getdata(background[i]))
 
+    Ph.append(pyfits.getdata(highz_info['psf'][0]))
+    input = image 
     #graficar
-    xdim = image[0].shape[0]
-    ydim = image[0].shape[1]
-    fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
-    fig.suptitle('Imagen inicial', fontsize=16)
-    for i in range(n_bands):
-        ax = axes[i]
-        im = ax.imshow(image[i], origin='lower', cmap='gray')
-        ax.set_title("Banda: "+lowz_info['filter'][i])
 
-        # Crear un eje para la colorbar
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(im, cax=cax, orientation='vertical')
-
-    plt.tight_layout()
-    plt.show()
     
     if imerr is None:
         for i in range(n_bands):
@@ -815,7 +801,8 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
         #select only 50% of all pixels with 0.25 < nsig < siglim
         if good1[0].size > 0:
-            good1_indices = random_indices(round(good1[0].size * 0.5), np.arange(good1[0].size))
+            n_selec = round(good1[0].size * 0.5)
+            good1_indices = np.random.choice(good1[0].size, size=n_selec, replace=False)
             good1 = (good1[0][good1_indices], good1[1][good1_indices])
         
         good = np.where((nhi >= 3) & (np.abs(nsig[filt_i]) > siglim))
@@ -837,10 +824,14 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
             combined_indices = np.vstack((good[0], good[1])).T
             unique_indices = np.unique(combined_indices, axis=0)#se eliminan los indices repetidos
             good = (unique_indices[:, 0], unique_indices[:, 1])
+        
+        
 
         ngood = good[0].size
         if ngood == 1 and good[0][0] == -1:
             print('No pixels to process')
+        else: 
+            print(str(ngood) + ' pixels to process')
                 
         
         maggies = []
@@ -894,28 +885,29 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
             kc = kc_obj
         else:
             #kcorrect object 
+            print("Creating kcorrect object...")
             cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
-            kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=responses_hi)
+            kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=responses_hi,responses_map=[responses_lo[idx_bestfilt]],cosmo=cos)
         
         coeffs = kc.fit_coeffs(redshift = redshift_lo,maggies = maggies,ivar = ivar)
         k_values =  kc.kcorrect(redshift=redshift_lo, coeffs=coeffs)
         
         #reconstruct magnitudes in a certain filter at a certain redshift
-        r_maggies = kc.reconstruct(redshift=redshift_hi,coeffs=coeffs)
+        r_maggies = kc.reconstruct_out(redshift=redshift_hi,coeffs=coeffs)
 
         #as background choose closest in redshift-space
+       
         bg = img_downscale[filt_i] / (1.0 + highz_info['redshift'])
-        
+        img_downscale = bg
         #put in K-corrections
         if isinstance(good, tuple) and len(good) == 2 and isinstance(good[0], np.ndarray) and isinstance(good[1], np.ndarray):
             for i in range(ngood):
-                for j in range(n_bands):
-                    img_downscale[j][good] = r_maggies[i][j]/(1.0 + highz_info['redshift'])
+                    img_downscale[good[0][i]][good[1][i]] = r_maggies[i]/(1.0 + highz_info['redshift'])
 
         #convert image back to cts
-        for i in range(n_bands):
-            img_downscale[i] = maggies2cts(img_downscale[i],highz_info['exptime'][i],highz_info['zp'][i])
-            bg = maggies2cts(bg,highz_info['exptime'][filt_i],highz_info['zp'][filt_i])
+
+            img_downscale = maggies2cts(img_downscale,highz_info['exptime'],highz_info['zp'])
+            bg = maggies2cts(bg,highz_info['exptime'],highz_info['zp'])
 
     med = scndi.median_filter(img_downscale, size=3)
     idx = np.where(~np.isfinite(img_downscale))
@@ -945,28 +937,17 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
                 img_downscale[idx[0][idx1]] = med[idx[0][idx1]]
 
     #subtracting sky here
-    for i in range(n_bands):
-        img_downscale[i] -= ring_sky(img_downscale[i], 50, 15, nw=True)
+        img_downscale -= ring_sky(img_downscale, 50, 15, nw=True)
 
 
     #graficar
-    xdim = img_downscale[0].shape[0]
-    ydim = img_downscale[0].shape[1]
-    fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
-    fig.suptitle('Resultado despues k-corrections, antes antes de aplicar conv', fontsize=16)
-    for i in range(n_bands):
-        ax = axes[i]
-        im = ax.imshow(img_downscale[i], origin='lower', cmap='gray')
-        ax.set_title("Banda: "+lowz_info['filter'][i])
-
-        # Crear un eje para la colorbar
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(im, cax=cax, orientation='vertical')
-
-    plt.tight_layout()
+    '''
+    plt.figure()
+    plt.imshow(img_downscale, cmap='gray')
+    plt.title('Science Data Input')
+    plt.colorbar()
     plt.show()
-    
+    '''
     if noconv==True:
         #ump_results(img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low),imgname,background,namesout,lowz_info,highz_info)
         #return img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low)
@@ -974,7 +955,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     
     #calculate the transformation PSF
     try:
-        psf_hi = Ph[idx_bestfilt]
+        psf_hi = Ph[0]
         psf_low,psf_high,psf_t = ferengi_transformation_psf(psf_lo,psf_hi,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'])
         
     except TypeError as err:
@@ -993,23 +974,36 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     recon_psf/=np.sum(recon_psf)
 
     #convolve the high redshift image with the transformation PSF
-    for i in  range(n_bands):
-        img_downscale[i] = ferengi_convolve_plus_noise(img_downscale[i]/highz_info['exptime'][i],psf_t,sky[i],highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
-        if np.amax(img_downscale[i]) == -99:
-            print('Sky Image not big enough!')
-            return -99,-99
+    
+    img_downscale = ferengi_convolve_plus_noise(img_downscale/highz_info['exptime'],psf_t,sky[idx_bestfilt],highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
+    if np.amax(img_downscale[i]) == -99:
+        print('Sky Image not big enough!')
+        return -99,-99
     
     #graficar
-    xdim = img_downscale[0].shape[0]
-    ydim = img_downscale[0].shape[1]
-    fig, axes = plt.subplots(1, n_bands, figsize=(15, 5))
-    fig.suptitle('Resultado final', fontsize=16)
+    
+    n_images = n_bands + 1  # +1 para incluir img_downscale
 
-    for i in range(n_bands):
+    # Crear la figura y los ejes
+    fig, axes = plt.subplots(1, n_images, figsize=(15, 5))
+    fig.suptitle("Comparación de Imágenes", fontsize=16)
+
+    # Mostrar img_downscale en el primer subplot
+    ax = axes[0]
+    im = ax.imshow(img_downscale, origin='lower', cmap='gray')
+    ax.set_title("Output")
+
+    # Crear un eje para la colorbar
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+
+    # Mostrar las imágenes de input en los subplots restantes
+    for i, img in enumerate(input, start=1):
         ax = axes[i]
-        im = ax.imshow(img_downscale[i], origin='lower', cmap='gray')
-        ax.set_title("Banda: "+lowz_info['filter'][i])
-
+        im = ax.imshow(img, origin='lower', cmap='gray')
+        ax.set_title("input "+lowz_info['filter'][i-1])
+        
         # Crear un eje para la colorbar
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
@@ -1017,9 +1011,6 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
     plt.tight_layout()
     plt.show()
-    
-    
-
 
 
     
@@ -1030,54 +1021,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
             
         
         
-            
-  
 
-    '''
-    median = scndi.median_filter(img_downscale,3)
-    idx = np.where(np.isfinite(img_downscale)==False)
-    img_downscale[idx]=median[idx]
-    
-    idx = np.where(img_downscale==0.0)
-    img_downscale[idx]=median[idx]
-    
-    X=img_downscale.shape[0]*0.5
-    Y=img_downscale.shape[1]*0.5 ## To be improved
-    
-    img_downscale-=ring_sky(img_downscale, 50,15,x=X,y=Y,nw=True)
-    
-    if noconv==True:
-        dump_results(img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low),imgname,background,namesout,lowz_info,highz_info)
-        return img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low)
-
-    try:
-        psf_low,psf_high,psf_t = ferengi_transformation_psf(psf_low,psf_hi,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'])
-        
-    except TypeError as err:
-        print('Enlarging PSF failed! Skipping Galaxy.')
-        return -99,-99
-
-    try:
-        recon_psf = ferengi_psf_centre(apcon.convolve_fft(psf_low,psf_t))
-    except ZeroDivisionError as err:
-        print('Reconstrution PSF failed!')
-        return -99,-99
-##    pyfits.writeto('transform_psf_dopterian.fits',psf_t,clobber=True)
-    
-    recon_psf/=np.sum(recon_psf)
-    
-    img_downscale = ferengi_convolve_plus_noise(img_downscale/highz_info['exptime'],psf_t,sky,highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
-    if np.amax(img_downscale) == -99:
-        print('Sky Image not big enough!')
-        return -99,-99
-
-##    import matplotlib.pyplot as mpl
-##    mpl.imshow(img_downscale);mpl.show()
-
-    dump_results(img_downscale,recon_psf,imgname,background,namesout,lowz_info,highz_info)
-    return img_downscale,recon_psf
-    '''
-    return None
 
 
 
