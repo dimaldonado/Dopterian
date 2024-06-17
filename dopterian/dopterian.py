@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import kcorrect as k 
 import statsmodels.api as sm
 from astropy.cosmology import FlatLambdaCDM
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.axes_grid1 import make_axes_locatable 
 
 #=====================================================================f=========
 #  CONSTANTS
@@ -118,10 +118,34 @@ def dist_ellipse(img,xc,yc,q,ang):
     return dmat
 
 def robust_linefit(x, y):
-    X = sm.add_constant(x)  # Agrega una constante para el término independiente
-    robust_model = sm.RLM(y, X, M=sm.robust.norms.HuberT())
-    results = robust_model.fit()
-    return results.params
+    print(x)
+    print(y)
+    if len(x) == 0 or len(y) == 0:
+        raise ValueError("Input arrays must not be empty")
+    
+    # Verificar si hay suficientes puntos para realizar el ajuste
+    if len(x) < 2 or len(y) < 2:
+        raise ValueError("Not enough data points to perform robust line fitting")
+    
+    # Verificar si hay valores NaN o infinitos y eliminarlos
+    valid_indices = np.isfinite(x) & np.isfinite(y)
+    if np.sum(valid_indices) < 2:
+        raise ValueError("Not enough valid data points to perform robust line fitting after removing NaNs/Infs")
+    
+    x = x[valid_indices]
+    y = y[valid_indices]
+    
+    # Verificar si todos los valores son idénticos
+    if np.all(x == x[0]) or np.all(y == y[0]):
+        raise ValueError("Cannot perform robust line fitting with identical values")
+
+    try:
+        X = sm.add_constant(x)  # Agrega una constante para el término independiente
+        robust_model = sm.RLM(y, X, M=sm.robust.norms.HuberT())
+        results = robust_model.fit()
+        return results.params
+    except ZeroDivisionError:
+        raise ValueError("Zero division error during robust line fitting")
 
 def resistent_mean(a,k):
     """Compute the mean value of an array using a k-sigma clipping method
@@ -710,8 +734,6 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
     Ph.append(pyfits.getdata(highz_info['psf'][0]))
     input = image 
-    #graficar
-
     
     if imerr is None:
         for i in range(n_bands):
@@ -739,15 +761,16 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
        #weight the closest filters in rest-frame more
         dz1 = np.abs(lambda_hi - lambda_lo)
-        ord = np.argsort(dz1)
-        weight = np.ones(n_bands)
-        if dz1[ord[0]] == 0:
+        ord = np.argsort(dz1)#Indices de los valores ordenados de menor a mayor
+        weight = np.ones(n_bands)#[1,1,1,1,1]
+        if dz1[ord[0]] == 0:  
             if n_bands == 2:
                 weight[ord] = [10, 4]
             elif n_bands == 3:
                 weight[ord] = [10, 4, 4]
             elif n_bands >= 4:
                 weight[ord] = [10, 4, 4] + [1] * (n_bands - 3)
+                             
         else:
             if n_bands == 2:
                 weight[ord] = [10, 8]
@@ -861,8 +884,8 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
         
         # Setup array with minimum errors for SDSS
 
-        err0 = np.tile(err0_mag, (ngood, 1))
-        wei = np.tile(weight, (ngood, 1))
+        err0 = np.tile(err0_mag, (ngood, 1)) #crea matriz con los valores de err0_mag en cada fila ngood veces
+        wei = np.tile(weight, (ngood, 1))    #crea matriz con los valores de weight en cada fila ngood veces
 
         #add image errors and minimum errors in quadrature
         err = np.array(err)
@@ -921,11 +944,16 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     if idx[0].size > 0:
         img_downscale[idx] = med[idx]
 
+    
     if nok == 0:
-        m, sig, nrej = resistent_mean(img_downscale,3)
+        m, sig, nrej = resistent_mean(img_downscale,3)#m = media, sig = desviacion estandar, nrej = numero de rechazos
         sig = sig * np.sqrt(np.size(img_downscale) - 1 - nrej)
-        idx = np.where(np.abs(img_downscale) > 10 * sig)
+        #test  = np.where(img_downscale > 1024)
+        #img_downscale[test[0][0]][test[1][0]] = sig*10.32+0.02
+        #img_downscale[test[0][6]][test[1][6]] = sig*10+0.01
+        idx = np.where(np.abs(img_downscale) > 10 * sig) #indices de img_downscale que cumplen con la condicion
         if idx[0].size > 0:
+            print('High sigma pixels detected')
             fit = robust_linefit(np.abs(bg[idx]), np.abs(img_downscale[idx]))
             delta = np.abs(img_downscale[idx]) - (fit[0] + fit[1] * np.abs(bg[idx]))
             
@@ -935,6 +963,8 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
             idx1 = np.where(delta / sig > 50)
             if idx1[0].size > 0:
                 img_downscale[idx[0][idx1]] = med[idx[0][idx1]]
+        
+                
 
     #subtracting sky here
         img_downscale -= ring_sky(img_downscale, 50, 15, nw=True)
@@ -949,9 +979,8 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     plt.show()
     '''
     if noconv==True:
-        #ump_results(img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low),imgname,background,namesout,lowz_info,highz_info)
-        #return img_downscale/highz_info['exptime'],psf_low/np.sum(psf_low)
-        return None
+        #dump_results(img_downscale/highz_info['exptime'],psf_lo/np.sum(psf_lo),images[filt_i],background[filt_i],namesout,lowz_info,highz_info)
+        return img_downscale/highz_info['exptime'],psf_lo/np.sum(psf_lo)
     
     #calculate the transformation PSF
     try:
@@ -963,7 +992,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
         return -99,-99
 
     try:
-        recon_psf = ferengi_psf_centre(apcon.convolve_fft(psf_low,psf_t))
+        recon_psf = ferengi_psf_centre(apcon.convolve_fft(psf_lo,psf_t))
     except ZeroDivisionError as err:
         print('Reconstrution PSF failed!')
         return -99,-99
@@ -1013,16 +1042,11 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     plt.show()
 
 
-    
-    
-    
-    return None
+
+    #dump_results(img_downscale,recon_psf,images[filt_i],background,namesout,lowz_info,highz_info)
+    return img_downscale,recon_psf
 
             
-        
-        
-
-
 
 
 if __name__=='__main__':
