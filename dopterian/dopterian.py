@@ -610,7 +610,8 @@ def ferengi_convolve_plus_noise(image,psf,sky,exptime,nonoise=False,border_clip=
         except ValueError:
 ##            raise ValueError('Sky Image not big enough!')
             return -99*np.ones(out.shape)
-        
+    else: 
+        out = out
     return out
 
 def dump_results(image,psf,imgname_in,bgimage_in,names_out,lowz_info,highz_info):
@@ -703,11 +704,7 @@ def ferengi(imgname,background,lowz_info,highz_info,namesout,imerr=None,noflux=F
 def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=None,kc_obj=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,border_clip=3):
 
     #image , background, lowz_info['psf'], highz_info['psf'], imerr listas con los los path de los archivos, deben tener el mismo numero de entradas
-
-
-    if (len(images) != len(background) != len(lowz_info['psf']) != len(highz_info['psf'])):
-        raise ValueError('All input lists must have the same number of entries')
-        return -99,-99
+    
 
     n_bands = len(images)
 
@@ -731,6 +728,17 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
         image.append(pyfits.getdata(images[i]))
         Pl.append(pyfits.getdata(lowz_info['psf'][i]))
         sky.append(pyfits.getdata(background[i]))
+
+    lengths = [len(images), len(background), len(lowz_info['psf'])]
+    if not all(length == lengths[0] for length in lengths):
+        print('All input lists must have the same number of entries')
+        return -99, -99
+    
+    shapes = [banda.shape for banda in image]
+    if len(set(shapes)) != 1:
+        print("Error: All images must have the same shape")
+        return -99,-99
+    
 
     Ph.append(pyfits.getdata(highz_info['psf'][0]))
     input = image 
@@ -785,7 +793,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
         for i in range(n_bands):
             img_downscale.append(ferengi_downscale(image[i],lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux))
-        
+            
             img_downscale[i]-=ring_sky(img_downscale[i], 50,15,nw=True)
         
             imerr_downscale.append(ferengi_downscale(im_err[i],lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux))
@@ -795,6 +803,9 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
             #calculate the flux in each pixel (convert image from cts to maggies)
             img_downscale[i] = cts2maggies(img_downscale[i],lowz_info['exptime'][i],lowz_info['zp'][i])
+            
+        
+        
         
         #siglim defines the sigma above which K-corrections are calculated
         siglim = 2
@@ -804,6 +815,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
         zmin = np.abs(lambda_hi / lambda_lo - 1 - highz_info['redshift'])
         filt_i = np.argmin(zmin)#indice del menor valor
+
         nsig = np.zeros_like(img_downscale) #[[28x28],[28x28],[28x28],[28x28],[28x28]]
         nhi = np.zeros_like(img_downscale[0])#[28x28]
         
@@ -851,72 +863,72 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
         
 
         ngood = good[0].size
-        if ngood == 1 and good[0][0] == -1:
+        if ngood == 0:
             print('No pixels to process')
         else: 
             print(str(ngood) + ' pixels to process')
                 
         
-        maggies = []
-        err = []
-        nsig_2d = [] 
+            maggies = []
+            err = []
+            nsig_2d = [] 
 
-        #setup the arrays for the pixels that are to be K-corrected
-        for i in range(ngood):
-            aux_maggies = []
-            aux_err = []
-            aux_nsig = []
-            for j in range(n_bands):
-                aux_maggies.append(img_downscale[j][good[0][i]][good[1][i]])
-                aux_err.append(imerr_downscale[j][good[0][i]][good[1][i]])  
-                aux_nsig.append(nsig[j][good[0][i]][good[1][i]])
-            maggies.append(np.array(aux_maggies))
-            nsig_2d.append(np.array(aux_nsig))
-            err.append(np.array(aux_err))
+            #setup the arrays for the pixels that are to be K-corrected
+            for i in range(ngood):
+                aux_maggies = []
+                aux_err = []
+                aux_nsig = []
+                for j in range(n_bands):
+                    aux_maggies.append(img_downscale[j][good[0][i]][good[1][i]])
+                    aux_err.append(imerr_downscale[j][good[0][i]][good[1][i]])  
+                    aux_nsig.append(nsig[j][good[0][i]][good[1][i]])
+                maggies.append(np.array(aux_maggies))
+                nsig_2d.append(np.array(aux_nsig))
+                err.append(np.array(aux_err))
 
-        #remove infinite values in the error image
-        for i in range(ngood):
-            inf = np.where(~np.isfinite(err[i]))
-            if inf[0].size > 0:
-                err[i][inf] = 99999
-            err[i] = np.abs(err[i])
-            err[i] = np.where(err[i] < 99999, err[i], 99999)
-        
-        # Setup array with minimum errors for SDSS
-
-        err0 = np.tile(err0_mag, (ngood, 1)) #crea matriz con los valores de err0_mag en cada fila ngood veces
-        wei = np.tile(weight, (ngood, 1))    #crea matriz con los valores de weight en cada fila ngood veces
-
-        #add image errors and minimum errors in quadrature
-        err = np.array(err)
-        err = np.sqrt(err0**2 + err**2)/wei
-        
-        # Convert errors from magnitudes to ivar (inverse variance)
-        ivar = (2.5 / np.log(10) / err / maggies)**2
-
-        inf = np.where(~np.isfinite(ivar))
-        if inf[0].size > 0:
-            ivar[inf] = np.max(ivar[np.isfinite(ivar)])
-
-        responses_lo = lowz_info['filter']
-        responses_hi = highz_info['filter']
-        redshift_lo = lowz_info['redshift']*np.ones(ngood)
-        redshift_hi = highz_info['redshift']*np.ones(ngood)
-
-        if kc_obj is not None:
+            #remove infinite values in the error image
+            for i in range(ngood):
+                inf = np.where(~np.isfinite(err[i]))
+                if inf[0].size > 0:
+                    err[i][inf] = 99999
+                err[i] = np.abs(err[i])
+                err[i] = np.where(err[i] < 99999, err[i], 99999)
             
-            kc = kc_obj
-        else:
-            #kcorrect object 
-            print("Creating kcorrect object...")
-            cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
-            kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=responses_hi,responses_map=[responses_lo[idx_bestfilt]],cosmo=cos)
-        
-        coeffs = kc.fit_coeffs(redshift = redshift_lo,maggies = maggies,ivar = ivar)
-        k_values =  kc.kcorrect(redshift=redshift_lo, coeffs=coeffs)
-        
-        #reconstruct magnitudes in a certain filter at a certain redshift
-        r_maggies = kc.reconstruct_out(redshift=redshift_hi,coeffs=coeffs)
+            # Setup array with minimum errors for SDSS
+
+            err0 = np.tile(err0_mag, (ngood, 1)) #crea matriz con los valores de err0_mag en cada fila ngood veces
+            wei = np.tile(weight, (ngood, 1))    #crea matriz con los valores de weight en cada fila ngood veces
+
+            #add image errors and minimum errors in quadrature
+            err = np.array(err)
+            err = np.sqrt(err0**2 + err**2)/wei
+            
+            # Convert errors from magnitudes to ivar (inverse variance)
+            ivar = (2.5 / np.log(10) / err / maggies)**2
+
+            inf = np.where(~np.isfinite(ivar))
+            if inf[0].size > 0:
+                ivar[inf] = np.max(ivar[np.isfinite(ivar)])
+
+            responses_lo = lowz_info['filter']
+            responses_hi = highz_info['filter']
+            redshift_lo = lowz_info['redshift']*np.ones(ngood)
+            redshift_hi = highz_info['redshift']*np.ones(ngood)
+
+            if kc_obj is not None:
+                
+                kc = kc_obj
+            else:
+                #kcorrect object 
+                print("Creating kcorrect object...")
+                cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
+                kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=responses_hi,responses_map=[responses_lo[idx_bestfilt]],cosmo=cos)
+            
+            coeffs = kc.fit_coeffs(redshift = redshift_lo,maggies = maggies,ivar = ivar)
+            k_values =  kc.kcorrect(redshift=redshift_lo, coeffs=coeffs)
+            
+            #reconstruct magnitudes in a certain filter at a certain redshift
+            r_maggies = kc.reconstruct_out(redshift=redshift_hi,coeffs=coeffs)
 
         #as background choose closest in redshift-space
        
@@ -929,8 +941,8 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
 
         #convert image back to cts
 
-            img_downscale = maggies2cts(img_downscale,highz_info['exptime'],highz_info['zp'])
-            bg = maggies2cts(bg,highz_info['exptime'],highz_info['zp'])
+        img_downscale = maggies2cts(img_downscale,highz_info['exptime'],highz_info['zp'])
+        bg = maggies2cts(bg,highz_info['exptime'],highz_info['zp'])
 
     med = scndi.median_filter(img_downscale, size=3)
     idx = np.where(~np.isfinite(img_downscale))
@@ -964,10 +976,10 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
             if idx1[0].size > 0:
                 img_downscale[idx[0][idx1]] = med[idx[0][idx1]]
         
-                
+    
 
     #subtracting sky here
-        img_downscale -= ring_sky(img_downscale, 50, 15, nw=True)
+    img_downscale -= ring_sky(img_downscale, 50, 15, nw=True)
 
 
     #graficar
@@ -1005,12 +1017,12 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     #convolve the high redshift image with the transformation PSF
     
     img_downscale = ferengi_convolve_plus_noise(img_downscale/highz_info['exptime'],psf_t,sky[idx_bestfilt],highz_info['exptime'],nonoise=nonoise,border_clip=border_clip,extend=extend)
-    if np.amax(img_downscale[i]) == -99:
+    if np.amax(img_downscale) == -99:
         print('Sky Image not big enough!')
         return -99,-99
     
     #graficar
-    
+    '''
     n_images = n_bands + 1  # +1 para incluir img_downscale
 
     # Crear la figura y los ejes
@@ -1041,10 +1053,10 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     plt.tight_layout()
     plt.show()
 
-
+    '''
 
     #dump_results(img_downscale,recon_psf,images[filt_i],background,namesout,lowz_info,highz_info)
-    return img_downscale,recon_psf
+    return img_downscale,recon_psf,ngood
 
             
 

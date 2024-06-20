@@ -11,6 +11,15 @@ import matplotlib.pyplot as plt
 
 #Script para probar la ejecucion de dopterian
 
+
+catalog_path = [
+                r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F160W_input_for_Dopterian.txt',
+                r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F475W_input_for_Dopterian.txt',
+                r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F625W_input_for_Dopterian.txt',
+                r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F775W_input_for_Dopterian.txt',
+                r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F814W_input_for_Dopterian.txt'
+            ]
+
 img = []
 sky = []
 rms = []
@@ -27,28 +36,28 @@ zp_lo = []
 
 
 sci_path = [
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F160W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F475W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F625W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F775W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\SCI_F814W_clash_a209_nir_0798.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F160W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F475W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F625W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F775W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F814W_clash_a209_nir_1767.fits',
 
 ]
 
 sky_path = [
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\sky_F160W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\sky_F475W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\sky_F625W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\sky_F775W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\sky_F814W_clash_a209_nir_0798.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F160W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F475W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F625W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F775W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F814W_clash_a209_nir_1767.fits',
 ]
 
 rms_path = [
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\RMS_F160W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\RMS_F475W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\RMS_F625W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\RMS_F775W_clash_a209_nir_0798.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorrect test\RMS_F814W_clash_a209_nir_0798.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F160W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F475W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F625W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F775W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F814W_clash_a209_nir_1767.fits',
 
 ]
 
@@ -127,7 +136,7 @@ pixscale_hi = 0.065
 
 
 
-lowz_info  = {'redshift': 0.194, 'psf': psf_path_list_lo,'zp': zp_lo, 'exptime': exptime_lo, 'filter': filter_lo, 'lam_eff': input_photplam, 'pixscale': pixscale_lo,'lambda': lambda_lo}
+lowz_info  = {'redshift': 0.202, 'psf': psf_path_list_lo,'zp': zp_lo, 'exptime': exptime_lo, 'filter': filter_lo, 'lam_eff': input_photplam, 'pixscale': pixscale_lo,'lambda': lambda_lo}
 
 highz_info  = {'redshift': 2.0, 'psf': psf_path_list_hi,'zp': zp_hi, 'exptime': exptime_hi, 'filter': filter_hi, 'lam_eff': input_photplam, 'pixscale': pixscale_hi,'lambda': lambda_hi}
 
@@ -140,7 +149,7 @@ output_psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorre
 #kc = k.kcorrect.Kcorrect(responses=filter_in, responses_out=filtter_out,responses_map=filter_map,cosmo=os)
 
 
-imOUT,psfOUT= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=True, extend=False, noflux=True)
+imOUT,psfOUT= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=False, extend=False, noflux=True)
 
 plt.figure()
 plt.imshow(img[0],origin='lower', cmap='gray')

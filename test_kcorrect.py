@@ -1,146 +1,236 @@
-import dopterian.dopterian as dopt
-from astropy.io import fits
-import numpy as np
-import math
-import matplotlib.pyplot as plt
 import kcorrect
+import kcorrections.kcorrections as kk
+import numpy as np
+from astropy.io import fits
+import dopterian.dopterian as dopt
+import itertools
+import dopterian.cosmology as cosmos
+from astropy.cosmology import FlatLambdaCDM
+import kcorrect as k
+import matplotlib.pyplot as plt
+import pandas as pd
+import os
+from mpl_toolkits.axes_grid1 import make_axes_locatable 
 
-#Script para probar la ejecucion de dopterian
+#Script para probar la ejecucion de dopterian + kcorrect
 
-sci_image = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\clash_a209_nir_0990_dopterian_input.fits'
-psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\hlsp_clash_hst_wfc3ir-65mas_all_f160w_v1_psf.fits'
-sky_image = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\sky_clash_a209_nir_0990_a209_dopterian_input.fits'
+catalogs = {
+            "F160W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F160W_input_for_Dopterian.txt',
+            "F475W":   r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F475W_input_for_Dopterian.txt',
+            "F625W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F625W_input_for_Dopterian.txt',
+            "F775W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F775W_input_for_Dopterian.txt',
+            "F814W":   r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F814W_input_for_Dopterian.txt'
+            
+            }
+data = {}
 
-output_sci = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Output\clash_a209_nir_0990_dopterian_outpu.fits'
-output_psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Output\hlsp_clash_hst_wfc3ir-65mas_all_f160w_v1_output_psf.fits'
+# Cargar los datos relevantes
+for key, file in catalogs.items():
+    data[key] = pd.read_csv(file, delim_whitespace=True, usecols=["CLASHID", "zb_1", "clusterName"])
 
-#leemos los fits
+# Obtener los nombres de los archivos que están presentes en todos los filtros
+common_clashids = set(data["F160W"]["CLASHID"])
 
-science_hdul = fits.open(sky_image)
-sky_data = science_hdul[0].data
-science_hdul.close()
+for key in data:
+    common_clashids.intersection_update(data[key]["CLASHID"])
 
-science_hdul = fits.open(psf)
-psf_data = science_hdul[0].data
-science_hdul.close()
+# Crear las listas de listas
+input_image_lists = [[] for _ in range(5)]
+z = [[] for _ in range(5)]
+clustername = [[] for _ in range(5)]
 
-science_hdul = fits.open(sci_image)
-science_hdul.info()
-science_data = science_hdul[0].data
-science_header = science_hdul[0].header
-science_hdul.close()
+# Asignar los nombres de los archivos correspondientes a cada filtro, así como zb_1 y clusterName
+filters = ["F160W", "F475W", "F625W", "F775W", "F814W"]
 
-n_pix_x = science_header['NAXIS1']
-n_pix_y = science_header['NAXIS2']
+for idx, filter in enumerate(filters):
+    for clash_id in common_clashids:
+        row = data[filter][data[filter]["CLASHID"] == clash_id]
+        if not row.empty:
+            input_image_lists[idx].append(f"{filter}_{row['CLASHID'].values[0]}.fits")
+            z[idx].append(row["zb_1"].values[0])
+            clustername[idx].append(row["clusterName"].values[0])
 
-#exptime
-exptime = science_header['EXPTIME']
-
-#pixscale 
-
-pixscale =  0.065
- 
-#input_photflam and input_photplam
-
-input_photflam = science_header['PHOTFLAM']
-input_photplam = science_header['PHOTPLAM']
-log_photflam = np.log10(input_photflam)
-log_photplam = np.log10(input_photplam)
-
-#zero point    
-zero_point = -2.5 * log_photflam - 5.0 * log_photplam - 2.408
-
-
-lowz_info  = {'redshift': 0.206, 'psf': psf,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale}
-
-highz_info  = {'redshift': 2.0, 'psf': psf,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale}
-
-
-
-#graficamos las imagenes de entrada
+base_path = "D:\\Documentos\\Diego\\U\\Memoria Titulo\\Dopterian\\Input\\A209\\"
 
 
-plt.figure()
-plt.imshow(science_data, cmap='gray')
-plt.title('Science Data Input')
-plt.colorbar()
+filename = input_image_lists
+sci_images_path = [[base_path+"SCI_" + image for image in sublist] for sublist in input_image_lists]
+rms_images_path = [[base_path+"RMS_" + image for image in sublist] for sublist in input_image_lists]
+sky_images_path = [[base_path+"sky_" + image for image in sublist] for sublist in input_image_lists]
+
+science_data = [[] for _ in range(5)]
+id_g= [[] for _ in range(5)]
+input_image_path = [[] for _ in range(5)]
+input_rms_path = [[] for _ in range(5)]
+input_sky_path = [[] for _ in range(5)]
+input_z = [[] for _ in range(5)]
+input_exptime = [[] for _ in range(5)]
+input_photflam = [[] for _ in range(5)]
+input_photplam = [[] for _ in range(5)]
+log_photflam = [[] for _ in range(5)]
+log_photplam = [[] for _ in range(5)]
+zp_lo = [[] for _ in range(5)]
+
+print("Reading files")
+
+for i in range(len(sci_images_path)):#filtros
+    sky_ok = False
+    rms_ok = False
+    sci_ok = False
+    for j in range(len(sci_images_path[i])):#filas
+
+        try:
+            with fits.open(sky_images_path[i][j]) as hdul:
+                sky_data = hdul[0].data
+                sky_ok = True
+        except FileNotFoundError:
+            print(f"File not found: {sky_images_path[i][j]}, skipping...")
+            continue
+        try:
+            with fits.open(rms_images_path[i][j]) as hdul:
+                imerr_data = hdul[0].data
+                rms_ok = True
+        except FileNotFoundError:
+            print(f"File not found: {rms_images_path[i][j]}, skipping...")
+            continue
+        try:
+            with fits.open(sci_images_path[i][j]) as hdul:
+                science_data[i].append(hdul[0].data)
+                science_header = hdul[0].header
+                sci_ok = True
+        except FileNotFoundError:
+            print(f"File not found: {sci_images_path[i][j]}, skipping...")
+            continue
 
 
-# Convertir la matriz de datos de science_data a float32
-science_data = science_data.astype(np.float32)
 
-# Convertir electrons/s a flujo físico en erg/s/cm^2/Å
-flux_erg_per_s_cm2_A = science_data * input_photflam
+#           -----------Low z parameters-----------
+        if sky_ok and rms_ok and sci_ok:
+            id_g[i].append(filename[i][j])
+            input_image_path[i].append(sci_images_path[i][j])
+            input_rms_path[i].append(rms_images_path[i][j])
+            input_sky_path[i].append(sky_images_path[i][j])
+            input_z[i].append(z[i][j])
+            input_exptime[i].append(science_header['EXPTIME'])
+            input_photflam[i].append(science_header['PHOTFLAM'])
+            input_photplam[i].append(science_header['PHOTPLAM'])
+            log_photflam[i].append(np.log10(input_photflam[i][-1]))
+            log_photplam[i].append(np.log10(input_photplam[i][-1]))
+            zp_lo[i].append(-2.5 * log_photflam[i][-1] - 5.0 * log_photplam[i][-1] - 2.408)
 
-# Convertir a flujo físico en erg/s/cm^2/Hz
-c = 2.99792458e18  # Velocidad de la luz en Å/s
-flux_erg_per_s_cm2_Hz = flux_erg_per_s_cm2_A * (input_photplam**2 / c)
 
-# Convertir a maggies
-flux_maggies = flux_erg_per_s_cm2_Hz / (3631e-23)
+psf_path_list_lo = [  
+            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_wfc3ir-65mas_all_f160w_v1_psf.fits',
+            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f475w_v1_psf.fits',
+            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f625w_v1_psf.fits',
+            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f775w_v1_psf.fits',
+            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f814w_v1_psf.fits'
+        ] 
 
-# Definir el error relativo en magnitudes (ejemplo con 0.2 magnitudes)
-err = 0.2
+filter_lo = ['clash_wfc3_f160w','clash_wfc3_f475w','clash_wfc3_f625w','clash_wfc3_f775w','clash_wfc3_f814w']
 
-# Calcular el error en maggies
-err_maggies = flux_maggies * (np.log(10)/2.5) * err
+#low z effective wavelengths
+lambda_lo = [15405,4770,6310,7647,8057]
 
-# Asegurarse de que los errores sean finitos y reemplazar valores NaN/Inf
-err_maggies = np.where(np.isfinite(err_maggies), err_maggies, np.nan)
-err_maggies = np.nan_to_num(err_maggies, nan=1e10, posinf=1e10, neginf=1e10)
+err0_mag = [0.05, 0.05, 0.05, 0.05, 0.05]
 
-# Calcular la varianza inversa (ivar) y asegurarse de que sea finita
-with np.errstate(divide='ignore', invalid='ignore'):
-    ivar_maggies = 1 / err_maggies**2
-    ivar_maggies = np.where(np.isfinite(ivar_maggies), ivar_maggies, np.nan)
-    ivar_maggies = np.nan_to_num(ivar_maggies, nan=0.0, posinf=0.0, neginf=0.0)
+# -----------High z parameters----------- 
 
-# Convertir ivar_maggies y flux_maggies a float32
-ivar_maggies = ivar_maggies.astype(np.float32)
-flux_maggies = flux_maggies.astype(np.float32)
+psf_path_list_hi = [r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f814w_v1_psf.fits']
 
-# Aplanar las matrices a 1D
-ivar_maggies = ivar_maggies.flatten()
-flux_maggies = flux_maggies.flatten()
+filter_hi = ['clash_wfc3_f814w']
 
-# Número de píxeles
-n_pizeles = len(flux_maggies)
+#high z effective wavelengths
+lambda_hi= 8057
 
-# Definir un redshift constante para todos los píxeles (ejemplo con 0.206)
-redshift = [0.206] * n_pizeles
 
-# Definir las respuestas de los filtros utilizados
-responses = ['clash_wfc3_f160w']
+pixscale = 0.065
 
-# Inicializar listas para almacenar los flujos y varianzas inversas por píxel
-maggies = [[] for n in range(n_pizeles)]
-ivar = [[] for n in range(n_pizeles)]
+zp_hi = zp_lo[-1]
 
-# Llenar las listas con los datos correspondientes
-for i in range(n_pizeles):
-    maggies[i].append(flux_maggies[i])
-    ivar[i].append(ivar_maggies[i])
+print("Creating kcorrect object...")
 
-# Inicializar el objeto Kcorrect con las respuestas de los filtros
-kc = kcorrect.kcorrect.Kcorrect(responses=responses)
+cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
+kc = k.kcorrect.Kcorrect(responses=filter_lo, responses_out=filter_hi,responses_map=filter_hi,cosmo=os)
 
-# Calcular los coeficientes de ajuste para cada píxel
-coeffs = kc.fit_coeffs(redshift=redshift, maggies=maggies, ivar=ivar)
+for i in range(len(input_image_path[0])):#por cada galaxia
+    print(f"Processing galaxy {id_g[0][i]}")
+    lowz_info  = {'redshift': input_z[0][i],
+                  'psf': psf_path_list_lo,
+                  'zp': [zp_lo[0][i], zp_lo[1][i], zp_lo[2][i], zp_lo[3][i], zp_lo[4][i]],
+                  'exptime': [input_exptime[0][i], input_exptime[1][i], input_exptime[2][i], input_exptime[3][i], input_exptime[4][i]],
+                  'filter': filter_lo, 
+                  'lam_eff': [input_photplam[0][i], input_photplam[1][i], input_photplam[2][i], input_photplam[3][i], input_photplam[4][i]],
+                  'pixscale': pixscale,
+                  'lambda': lambda_lo}
 
-# Calcular las correcciones k para cada píxel
-k = kc.kcorrect(redshift=redshift, coeffs=coeffs)
+    highz_info  = {'redshift': 2.0, 
+                   'psf': psf_path_list_hi,
+                   'zp': zp_hi[i], 
+                   'exptime': input_exptime[-1][i],
+                   'filter': filter_hi, 
+                   'lam_eff': [input_photplam[0][i], input_photplam[1][i], input_photplam[2][i], input_photplam[3][i], input_photplam[4][i]], 
+                   'pixscale': pixscale,
+                   'lambda': lambda_hi}
+    
+    
 
-# Calcular las magnitudes absolutas para cada píxel
-absmag = kc.absmag(redshift=redshift, maggies=maggies, ivar=ivar, coeffs=coeffs)
+    output_sci = ""
+    output_psf = ""
+    print(input_image_path[0][i])
 
-absmag = np.clip(absmag, -np.finfo(np.float64).max, np.finfo(np.float64).max)
 
-flux_transformed = 10**(-0.4 * (absmag + 48.6))
+    imOUT,psfOUT,n_pkcorrect= dopt.ferengi_k(
+                                images = [input_image_path[0][i], input_image_path[1][i], input_image_path[2][i], input_image_path[3][i], input_image_path[4][i]],
+                                background= [input_sky_path[0][i], input_sky_path[1][i], input_sky_path[2][i], input_sky_path[3][i], input_sky_path[4][i]],
+                                lowz_info = lowz_info, 
+                                highz_info = highz_info, 
+                                namesout= [output_sci, output_psf], 
+                                imerr = [input_rms_path[0][i], input_rms_path[1][i], input_rms_path[2][i], input_rms_path[3][i], input_rms_path[4][i]],
+                                err0_mag = err0_mag, 
+                                noconv=False, 
+                                evo=None, 
+                                nonoise=True, 
+                                extend=False, 
+                                noflux=True,
+                                kc_obj=kc)
+    if np.any(imOUT != -99):  # Corrección de la condición
+        n_images = len(lowz_info['filter']) + 1  # +1 para incluir imOUT
 
-flux_transformed_image = flux_transformed.reshape((n_pix_y, n_pix_x))
+        # Crear la figura y los ejes con subplots dispuestos horizontalmente
+        fig, axes = plt.subplots(1, n_images, figsize=(15, 5))  # Cambiado a 1 fila y n_images columnas
+        galaxy_name = input_image_lists[0][i]
+        galaxy_name = galaxy_name[6:]
+        fig.suptitle("Test kcorrect " + galaxy_name + ": " + str(n_pkcorrect) + " pixels corrected", fontsize=16)
 
-plt.figure()
-plt.imshow(flux_transformed_image, cmap='gray')
-plt.title('Science Data Input')
-plt.colorbar()
-plt.show()
+        # Mostrar imOUT en el primer subplot
+        ax = axes[0]
+        im = ax.imshow(imOUT, origin='lower', cmap='gray')
+        ax.set_title(f"{highz_info['filter'][0]} z: {highz_info['redshift']}")
+
+        # Crear un eje para la colorbar
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+
+        # Mostrar las imágenes de input en los subplots restantes
+        for j in range(len(lowz_info['filter'])):
+            ax = axes[j + 1]
+            im = ax.imshow(science_data[j][i], origin='lower', cmap='gray')
+            ax.set_title(f"{lowz_info['filter'][j]} z: {lowz_info['redshift']}")
+            
+            # Crear un eje para la colorbar
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            fig.colorbar(im, cax=cax, orientation='vertical')
+
+        plt.tight_layout()
+
+        output_dir = r"D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\ouput_kcorrect"
+        output_filename = "test_kcorrect_" + galaxy_name + ".png"
+        output_path = os.path.join(output_dir, output_filename)
+        plt.savefig(output_path)
+        plt.close(fig)
+
+
+    
