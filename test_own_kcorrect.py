@@ -36,28 +36,28 @@ zp_lo = []
 
 
 sci_path = [
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F160W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F475W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F625W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F775W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F814W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F160W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F475W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F625W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F775W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\SCI_F814W_clash_a209_nir_1589.fits',
 
 ]
 
 sky_path = [
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F160W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F475W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F625W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F775W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F814W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F160W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F475W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F625W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F775W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\sky_F814W_clash_a209_nir_1589.fits',
 ]
 
 rms_path = [
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F160W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F475W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F625W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F775W_clash_a209_nir_1767.fits',
-    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F814W_clash_a209_nir_1767.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F160W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F475W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F625W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F775W_clash_a209_nir_1589.fits',
+    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\RMS_F814W_clash_a209_nir_1589.fits',
 
 ]
 
@@ -115,10 +115,10 @@ pixscale_lo = 0.065
 #           -----------High z parameters----------- 
 psf_path_list_hi = [r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f814w_v1_psf.fits']
 
-filter_hi = ['clash_wfc3_f814w']
+filter_hi = 'clash_wfc3_f814w'
 
 #high z effective wavelengths
-lambda_hi= [8057]
+lambda_hi= 8057
 
 #reading images
 science_hdul = fits.open(psf_path_list_hi[0])
@@ -149,7 +149,7 @@ output_psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorre
 #kc = k.kcorrect.Kcorrect(responses=filter_in, responses_out=filtter_out,responses_map=filter_map,cosmo=os)
 
 
-imOUT,psfOUT= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=False, extend=False, noflux=True)
+imOUT,psfOUT,_= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=False, extend=False, noflux=True)
 
 plt.figure()
 plt.imshow(img[0],origin='lower', cmap='gray')

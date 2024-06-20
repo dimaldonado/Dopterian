@@ -120,32 +120,10 @@ def dist_ellipse(img,xc,yc,q,ang):
 def robust_linefit(x, y):
     print(x)
     print(y)
-    if len(x) == 0 or len(y) == 0:
-        raise ValueError("Input arrays must not be empty")
-    
-    # Verificar si hay suficientes puntos para realizar el ajuste
-    if len(x) < 2 or len(y) < 2:
-        raise ValueError("Not enough data points to perform robust line fitting")
-    
-    # Verificar si hay valores NaN o infinitos y eliminarlos
-    valid_indices = np.isfinite(x) & np.isfinite(y)
-    if np.sum(valid_indices) < 2:
-        raise ValueError("Not enough valid data points to perform robust line fitting after removing NaNs/Infs")
-    
-    x = x[valid_indices]
-    y = y[valid_indices]
-    
-    # Verificar si todos los valores son idénticos
-    if np.all(x == x[0]) or np.all(y == y[0]):
-        raise ValueError("Cannot perform robust line fitting with identical values")
-
-    try:
-        X = sm.add_constant(x)  # Agrega una constante para el término independiente
-        robust_model = sm.RLM(y, X, M=sm.robust.norms.HuberT())
-        results = robust_model.fit()
-        return results.params
-    except ZeroDivisionError:
-        raise ValueError("Zero division error during robust line fitting")
+    X = sm.add_constant(x)  # Agrega una constante para el término independiente
+    robust_model = sm.RLM(y, X, M=sm.robust.norms.HuberT())
+    results = robust_model.fit()
+    return results.params
 
 def resistent_mean(a,k):
     """Compute the mean value of an array using a k-sigma clipping method
@@ -459,9 +437,13 @@ def rebin2d(img,Nout,Mout,flux_scale=False):
         frac1 = rstart-istart
         frac2 = 1.0 - (rstop-istop)       
         if istart == istop:
-            temp_y[:,i] = (1.0-frac1-frac2)*img[:,istart]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                temp_y[:, i] = (1.0 - frac1 - frac2) * img[:, istart]
         else:
-            temp_y[:,i] = np.sum(img[:,istart:istop+1],1) - frac1 * img[:,istart] - frac2 * img[:,istop]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                temp_y[:, i] = np.sum(img[:, istart:istop + 1], 1) - frac1 * img[:, istart] - frac2 * img[:, istop]
 
     temp_y = temp_y.transpose()
     img_bin = np.zeros([Mout,Nout])
@@ -480,9 +462,13 @@ def rebin2d(img,Nout,Mout,flux_scale=False):
         frac2 = 1.0 - (rstop-istop)
 
         if istart == istop:
-            img_bin[:,i] = (1.0-frac1-frac2)*temp_y[:,istart]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                img_bin[:, i] = (1.0 - frac1 - frac2) * temp_y[:, istart]
         else:
-            img_bin[:,i] = np.sum(temp_y[:,istart:istop+1],1) - frac1 * temp_y[:,istart]- frac2 * temp_y[:,istop]        
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                img_bin[:, i] = np.sum(temp_y[:, istart:istop + 1], 1) - frac1 * temp_y[:, istart] - frac2 * temp_y[:, istop]      
 
     if flux_scale:
         return img_bin.transpose()
@@ -922,7 +908,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
                 #kcorrect object 
                 print("Creating kcorrect object...")
                 cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
-                kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=responses_hi,responses_map=[responses_lo[idx_bestfilt]],cosmo=cos)
+                kc = k.kcorrect.Kcorrect(responses=responses_lo,responses_out=[responses_hi],responses_map=[responses_lo[idx_bestfilt]],cosmo=cos)
             
             coeffs = kc.fit_coeffs(redshift = redshift_lo,maggies = maggies,ivar = ivar)
             k_values =  kc.kcorrect(redshift=redshift_lo, coeffs=coeffs)
@@ -960,10 +946,7 @@ def ferengi_k(images,background,lowz_info,highz_info,namesout,imerr=None,err0_ma
     if nok == 0:
         m, sig, nrej = resistent_mean(img_downscale,3)#m = media, sig = desviacion estandar, nrej = numero de rechazos
         sig = sig * np.sqrt(np.size(img_downscale) - 1 - nrej)
-        #test  = np.where(img_downscale > 1024)
-        #img_downscale[test[0][0]][test[1][0]] = sig*10.32+0.02
-        #img_downscale[test[0][6]][test[1][6]] = sig*10+0.01
-        idx = np.where(np.abs(img_downscale) > 10 * sig) #indices de img_downscale que cumplen con la condicion
+        idx = np.where((np.abs(img_downscale) > 10 * sig) & (img_downscale!=bg)) #indices de img_downscale que cumplen con la condicion
         if idx[0].size > 0:
             print('High sigma pixels detected')
             fit = robust_linefit(np.abs(bg[idx]), np.abs(img_downscale[idx]))
