@@ -1,12 +1,9 @@
-import kcorrect
-import kcorrections.kcorrections as kk
 import numpy as np
 from astropy.io import fits
-import dopterian.dopterian as dopt
+from dopterian import dopterian as dopt
 import itertools
 import dopterian.cosmology as cosmos
 from astropy.cosmology import FlatLambdaCDM
-import kcorrect as k
 import matplotlib.pyplot as plt
 
 #Script para probar la ejecucion de dopterian
@@ -149,7 +146,7 @@ output_psf = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\input kcorre
 #kc = k.kcorrect.Kcorrect(responses=filter_in, responses_out=filtter_out,responses_map=filter_map,cosmo=os)
 
 
-imOUT,psfOUT,_= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=False, extend=False, noflux=True)
+imOUT,psfOUT,_= dopt.ferengi_k(sci_path, sky_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_path, err0_mag=err0_mag, noconv=False, evo=None, nonoise=True, extend=False, noflux=True)
 
 plt.figure()
 plt.imshow(img[0],origin='lower', cmap='gray')
