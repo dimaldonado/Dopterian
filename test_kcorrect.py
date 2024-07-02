@@ -1,10 +1,7 @@
-import kcorrect
-import kcorrections.kcorrections as kk
 import numpy as np
 from astropy.io import fits
-import dopterian.dopterian as dopt
-import itertools
-import dopterian.cosmology as cosmos
+from dopterian import dopterian as dopt
+from dopterian import cosmology as cosmos
 from astropy.cosmology import FlatLambdaCDM
 import kcorrect as k
 import matplotlib.pyplot as plt
@@ -154,7 +151,10 @@ cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
 kc = k.kcorrect.Kcorrect(responses=filter_lo, responses_out=filter_hi,responses_map=filter_hi,cosmo=os)
 
 for i in range(len(input_image_path[0])):#por cada galaxia
-    print(f"Processing galaxy {id_g[0][i]}")
+    name = id_g[0][i]
+    name = name.replace("F160W_", "")
+    print(f"Processing galaxy {name}")
+
     lowz_info  = {'redshift': input_z[0][i],
                   'psf': psf_path_list_lo,
                   'zp': [zp_lo[0][i], zp_lo[1][i], zp_lo[2][i], zp_lo[3][i], zp_lo[4][i]],
@@ -174,13 +174,11 @@ for i in range(len(input_image_path[0])):#por cada galaxia
                    'lambda': lambda_hi}
     
     
-
-    output_sci = ""
-    output_psf = ""
+    
+    output_sci = "D:\\Documentos\\Diego\\U\\Memoria Titulo\Dopterian\\Input\\A209\\ouput_kcorrect\\fits\\"+"output_sci_"+name
+    output_psf = "D:\\Documentos\\Diego\\U\\Memoria Titulo\Dopterian\\Input\\A209\\ouput_kcorrect\\fits\\"+"output_psf_"+name
     print(input_image_path[0][i])
-
-
-    imOUT,psfOUT,n_pkcorrect= dopt.ferengi_k(
+    imOUT,psfOUT,n_pkcorrect= dopt.ferengi(
                                 images = [input_image_path[0][i], input_image_path[1][i], input_image_path[2][i], input_image_path[3][i], input_image_path[4][i]],
                                 background= [input_sky_path[0][i], input_sky_path[1][i], input_sky_path[2][i], input_sky_path[3][i], input_sky_path[4][i]],
                                 lowz_info = lowz_info, 
@@ -191,7 +189,7 @@ for i in range(len(input_image_path[0])):#por cada galaxia
                                 noconv=False, 
                                 evo=None, 
                                 nonoise=True, 
-                                extend=False, 
+                                extend=True, 
                                 noflux=True,
                                 kc_obj=kc)
     if np.any(imOUT != -99):  # Corrección de la condición
