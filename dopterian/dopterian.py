@@ -863,7 +863,7 @@ def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=
         return -99,-99
     
 
-    Ph.append(pyfits.getdata(highz_info['psf'][0]))
+    Ph.append(pyfits.getdata(highz_info['psf']))
     input = image 
     
     if imerr is None:
@@ -875,7 +875,7 @@ def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=
 
     
     if apply_kcorrect==False: #k false
-        img_nok = maggies2cts(cts2maggies(image[0],lowz_info['exptime'],lowz_info['zp']),highz_info['exptime'],highz_info['zp'])#*1000.
+        img_nok = maggies2cts(cts2maggies(image[0],lowz_info['exptime'],lowz_info['zp'][0]),highz_info['exptime'],highz_info['zp'])#*1000.
         psf_lo = Pl[0]
         psf_hi = Ph[0]
     

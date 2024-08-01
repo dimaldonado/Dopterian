@@ -125,13 +125,13 @@ for i in range(len(catalog_path)):
 
             filter = "wfc3_"+filters[i].lower()
 
-            lowz_info  = {'redshift': zb_1, 'psf': psf_path,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale}
+            lowz_info  = {'redshift': zb_1, 'psf': [psf_path],'zp': [zero_point], 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale, 'lambda': None}
 
-            highz_info  = {'redshift': 2.0, 'psf': psf_path,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale}
+            highz_info  = {'redshift': 2.0, 'psf': psf_path,'zp': zero_point, 'exptime': exptime, 'filter': 'wfc3_f160w', 'lam_eff': input_photplam, 'pixscale': pixscale, 'lambda': None}
 
             input_image_list.append(science_data)
             data_list.append(sci_filename+"  z:"+str(zb_1))
-            imOUT, psfOUT = dopt.ferengi(sci_fits_path, sky_fits_path, lowz_info, highz_info, [output_sci, output_psf], imerr=rms_fits_path ,noflux=False,evo=None, noconv=False, kcorrect=False, extend=False, nonoise=True)
+            imOUT, psfOUT,_ = dopt.ferengi([sci_fits_path], [sky_fits_path], lowz_info, highz_info, [output_sci, output_psf], imerr=[rms_fits_path] ,noflux=False,evo=None, noconv=False, kcorrect=False, extend=False, nonoise=True)
             output_image_list.append(imOUT)
 
             fig, axs = plt.subplots(1, 2, figsize=(10, 5))

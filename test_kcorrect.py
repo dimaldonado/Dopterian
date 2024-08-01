@@ -133,7 +133,7 @@ err0_mag = [0.05, 0.05, 0.05, 0.05, 0.05]
 
 # -----------High z parameters----------- 
 
-psf_path_list_hi = [r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f814w_v1_psf.fits']
+psf_path_list_hi = r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f814w_v1_psf.fits'
 
 filter_hi = ['clash_wfc3_f814w']
 
@@ -189,7 +189,7 @@ for i in range(len(input_image_path[0])):#por cada galaxia
                                 noconv=False, 
                                 evo=None, 
                                 nonoise=True, 
-                                extend=True, 
+                                extend=False, 
                                 noflux=True,
                                 kc_obj=kc)
     if np.any(imOUT != -99):  # Corrección de la condición
