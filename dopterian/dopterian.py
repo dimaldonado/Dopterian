@@ -18,10 +18,11 @@ import astropy.convolution as apcon
 from astropy.cosmology import FlatLambdaCDM
 from dopterian import cosmology as cosmos
 import kcorrect
-
+from scipy.optimize import curve_fit
+from dopterian import calc_FWHM
+import os
 
 version = '1.0.0'   
-
 
 
 version = '1.0.0'   
@@ -110,6 +111,37 @@ def edge_index(a,rx,ry):
     idx = np.where(((X==rx) * (Y<=ry)) + ((Y==ry) * (X<=rx)))
 ####    CHECK
     return idx
+
+
+def predict_redshifted_FWHM(a_low, z_low, z_high):
+
+    # calcuating the luminosity distances at low and high redshift
+
+    d_low = cosmos.luminosity_distance(z_low) 
+    d_high = cosmos.luminosity_distance(z_high)
+
+    # calcuating the predicted FWHM
+    a_high = a_low* ( d_low/(1+z_low)**2 )/( d_high/(1+z_high)**2 )
+
+    
+    # returning the predicted high-z FWHM
+    return a_high    
+
+def check_PSF_FWHM(psf_low,psf_high,pixcale_low_z,pixscale_high_z,z_low,z_high):
+
+    low_z_fwhm = calc_FWHM.calc_FWHM(psf_low, pixcale_low_z)
+    high_z_fwhm = calc_FWHM.calc_FWHM(psf_high, pixscale_high_z)
+
+    redshifted_low_z_fwhm = predict_redshifted_FWHM(low_z_fwhm, z_low, z_high)
+
+    if redshifted_low_z_fwhm > high_z_fwhm:
+        return False
+    
+    return True
+    
+    
+        
+
 
 
 def dist_ellipse(img,xc,yc,q,ang):
@@ -268,6 +300,9 @@ def barycenter(img,segmap):
 
 
 def ferengi_psf_centre(psf,debug=False):
+    # Verificamos si el psf tiene una tercera dimensión que sea de tamaño 1
+    if len(psf.shape) == 3 and psf.shape[0] == 1:
+        psf = psf.squeeze(axis=0)  # Elimina la primera dimensión si es 1
     "Center the psf image using its light barycenter and not a 2D gaussian fit."
     N,M=psf.shape
     
@@ -603,6 +638,9 @@ def ferengi_convolve_plus_noise(image,psf,sky,exptime,nonoise=False,border_clip=
         out = out
     return out
 
+import os
+
+
 def dump_results(image, psf, imgname_in, bgimage_in, names_out, lowz_info, highz_info):
     name_imout, name_psfout = names_out
     
@@ -610,30 +648,48 @@ def dump_results(image, psf, imgname_in, bgimage_in, names_out, lowz_info, highz
     hdu = pyfits.HDUList([Hprim])
     hdr_img = hdu[0].header
     
-    if isinstance(imgname_in, list):
-        imgname_str = ', '.join(map(str, imgname_in))
-    else:
-        imgname_str = str(imgname_in)
-    
-    if isinstance(bgimage_in, list):
-        bgimage_str = ', '.join(map(str, bgimage_in))
-    else:
-        bgimage_str = str(bgimage_in)
-    
-    hdr_img['INPUT'] = imgname_str
-    hdr_img['SKY_IMG'] = bgimage_str
-    for key in lowz_info.keys():
-        if isinstance(lowz_info[key], list):
-            hdr_img['%s_i' % key[:4]] = (', '.join(map(str, lowz_info[key])), '%s value for input lowz object' % (key))
+    # Utility function to add multi-entry parameters as separate numbered columns
+    def add_multi_entry(header, base_key, values, description, enumerate_single=False):
+        if isinstance(values, list):
+            if len(values) == 1 and not enumerate_single:  # No enumeration if only one element and enumerate_single is False
+                header[base_key] = (str(values[0]), description)
+            else:
+                for i, value in enumerate(values, 1):
+                    # Shorten base_key to 6 characters to keep within 8-character limit when adding "_i" suffix
+                    header[f"{base_key[:6]}_{i}"] = (str(value), f"{description} {i}")
         else:
-            hdr_img['%s_i' % key[:4]] = (str(lowz_info[key]), '%s value for input lowz object' % (key))
-    hdr_img['comment'] = 'Using ferengi.py version %s' % version
-    for key in highz_info.keys():
-        if isinstance(highz_info[key], list):
-            hdr_img['%s_o' % key[:4]] = (', '.join(map(str, highz_info[key])), '%s value for input highz object' % (key))
+            header[base_key] = (str(values), description)
+
+    # Convert input image names and background image names to filenames only
+    imgname_list = [os.path.basename(str(path)) for path in imgname_in] if isinstance(imgname_in, list) else [os.path.basename(str(imgname_in))]
+    bgimage_list = [os.path.basename(str(path)) for path in bgimage_in] if isinstance(bgimage_in, list) else [os.path.basename(str(bgimage_in))]
+
+    # Add each entry as separate columns
+    add_multi_entry(hdr_img, 'INPUT', imgname_list, 'Input image')
+    add_multi_entry(hdr_img, 'SKYIM', bgimage_list, 'Background image')  # Changed 'SKY_IMG' to 'SKYIM'
+
+    # Process low-z information with multi-column handling and enumeration for all lists
+    for key, value in lowz_info.items():
+        base_key = f"{key[:4].upper()}_I"
+        if key.lower() == "psf":
+            value_list = [os.path.basename(str(v)) for v in value] if isinstance(value, list) else [os.path.basename(str(value))]
         else:
-            hdr_img['%s_o' % key[:4]] = (str(highz_info[key]), '%s value for input highz object' % (key))
+            value_list = value if isinstance(value, list) else [value]
+        add_multi_entry(hdr_img, base_key, value_list, f"{key} input lowz", enumerate_single=True)
+
+    hdr_img['comment'] = f'Using ferengi.py version {version}'
+
+    # Process high-z information, avoiding enumeration if there’s a single value in lists
+    for key, value in highz_info.items():
+        base_key = f"{key[:4].upper()}_O"
+        if key.lower() == "psf":
+            value_list = [os.path.basename(str(v)) for v in value] if isinstance(value, list) else [os.path.basename(str(value))]
+        else:
+            value_list = value if isinstance(value, list) else [value]
+        # For high-z info, set enumerate_single=False to avoid suffix if there's a single value
+        add_multi_entry(hdr_img, base_key, value_list, f"{key} input highz", enumerate_single=False)
     
+    # Write the image and PSF to files
     hdu.writeto(name_imout, overwrite=True)
     pyfits.writeto(name_psfout, psf, overwrite=True)
     return
@@ -824,11 +880,10 @@ def kcorrect_maggies(image,im_err,lowz_info,highz_info,lambda_lo,lambda_hi,err0_
 
     
 
-def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=None,kc_obj=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,border_clip=3):
+def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=None,kc_obj=None,noflux=False,evo=None,noconv=False,kcorrect=False,extend=False,nonoise=False,check_psf_FWHM=False,border_clip=3):
 
     #image , background, lowz_info['psf'], highz_info['psf'], imerr listas con los los path de los archivos, deben tener el mismo numero de entradas
     
-
     n_bands = len(images)
 
     if n_bands == 1:
@@ -855,12 +910,12 @@ def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=
     lengths = [len(images), len(background), len(lowz_info['psf'])]
     if not all(length == lengths[0] for length in lengths):
         print('All input lists must have the same number of entries')
-        return -99, -99
+        return -99, -99, -99
     
     shapes = [banda.shape for banda in image]
     if len(set(shapes)) != 1:
         print("Error: All images must have the same shape")
-        return -99,-99
+        return -99,-99, -99
     
 
     Ph.append(pyfits.getdata(highz_info['psf']))
@@ -878,13 +933,21 @@ def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=
         img_nok = maggies2cts(cts2maggies(image[0],lowz_info['exptime'],lowz_info['zp'][0]),highz_info['exptime'],highz_info['zp'])#*1000.
         psf_lo = Pl[0]
         psf_hi = Ph[0]
-    
+
     else:
         #select best matching PSF for output redshift
         dz = np.abs(lambda_hi / lambda_lo - 1)
         idx_bestfilt = np.argmin(dz)
         psf_lo = Pl[idx_bestfilt]
-    
+        psf_hi = Ph[0]
+
+    if(check_psf_FWHM == True and check_PSF_FWHM(psf_lo,psf_hi,lowz_info['pixscale'],highz_info['pixscale'],lowz_info['redshift'],highz_info['redshift']) == False): 
+        
+        print("the FWHM of the redshifted PSF is broader than that of the high-z PSF. The simulation is not possible")
+        return -99, -99, -99
+
+
+
     if apply_kcorrect==False: #k false
         #scale the image down
         img_downscale = ferengi_downscale(img_nok,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'],evo=evo,nofluxscale=noflux)
@@ -927,35 +990,33 @@ def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=
     #subtracting sky here
     img_downscale -= ring_sky(img_downscale, 50, 15, nw=True)
 
-
-    #graficar
-    '''
-    plt.figure()
-    plt.imshow(img_downscale, cmap='gray')
-    plt.title('Science Data Input')
-    plt.colorbar()
-    plt.show()
-    '''
+ 
     if noconv==True:
-        #dump_results(img_downscale/highz_info['exptime'],psf_lo/np.sum(psf_lo),images[filt_i],background[filt_i],namesout,lowz_info,highz_info)
+        dump_results(img_downscale/highz_info['exptime'],psf_lo/np.sum(psf_lo),images,background,namesout,lowz_info,highz_info)
         return img_downscale/highz_info['exptime'],psf_lo/np.sum(psf_lo)
     
     #calculate the transformation PSF
     try:
-        psf_hi = Ph[0]
+    
         psf_low,psf_high,psf_t = ferengi_transformation_psf(psf_lo,psf_hi,lowz_info['redshift'],highz_info['redshift'],lowz_info['pixscale'],highz_info['pixscale'])
         
     except TypeError as err:
         print('Enlarging PSF failed! Skipping Galaxy.')
-        return -99,-99
+        return -99,-99, -99
 
     try:
+        # Asegurarnos de que tanto psf_lo como psf_t tengan el mismo número de dimensiones
+        if psf_lo.ndim > 2 or psf_t.ndim > 2:
+            # Si alguna de las matrices tiene una dimensión extra de tamaño 1, la eliminamos
+            psf_lo = np.squeeze(psf_lo)
+            psf_t = np.squeeze(psf_t)
+
         recon_psf = ferengi_psf_centre(apcon.convolve_fft(psf_lo,psf_t))
     except ZeroDivisionError as err:
         print('Reconstrution PSF failed!')
-        return -99,-99
-##    pyfits.writeto('transform_psf_dopterian.fits',psf_t,clobber=True)
+        return -99,-99, -99
     
+
     
     #normalise reconstructed PSF
     recon_psf/=np.sum(recon_psf)
@@ -969,64 +1030,9 @@ def ferengi(images,background,lowz_info,highz_info,namesout,imerr=None,err0_mag=
     if np.amax(img_downscale) == -99:
         print('Sky Image not big enough!')
         return -99,-99
-    
-    #graficar
-    '''
-    n_images = n_bands + 1  # +1 para incluir img_downscale
-
-    # Crear la figura y los ejes
-    fig, axes = plt.subplots(1, n_images, figsize=(15, 5))
-    fig.suptitle("Comparación de Imágenes", fontsize=16)
-
-    # Mostrar img_downscale en el primer subplot
-    ax = axes[0]
-    im = ax.imshow(img_downscale, origin='lower', cmap='gray')
-    ax.set_title("Output")
-
-    # Crear un eje para la colorbar
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes('right', size='5%', pad=0.05)
-    fig.colorbar(im, cax=cax, orientation='vertical')
-
-    # Mostrar las imágenes de input en los subplots restantes
-    for i, img in enumerate(input, start=1):
-        ax = axes[i]
-        im = ax.imshow(img, origin='lower', cmap='gray')
-        ax.set_title("input "+lowz_info['filter'][i-1])
-        
-        # Crear un eje para la colorbar
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(im, cax=cax, orientation='vertical')
-
-    plt.tight_layout()
-    plt.show()
-
-    '''
 
     dump_results(img_downscale,recon_psf,images,background,namesout,lowz_info,highz_info)
+    
     return img_downscale,recon_psf,n_pixk
 
             
-
-
-if __name__=='__main__':
-    PlowName='psf_sdss.fits'
-    PhighName='psf_acs.fits'
-    BgName='sky_ACSTILE_40x40.fits'
-    InputImName='galaxy.fits'
-    
-    lowz_info = {'redshift':0.017,'psf':PlowName,'zp':28.235952,'exptime':53.907456,'filter':'r','lam_eff':6185.0,'pixscale':0.396}
-    highz_info = {'redshift':0.06,'psf':PhighName,'zp':25.947,'exptime':6900.,'filter':'f814w','lam_eff':8140.0,'pixscale':0.03}
-    
-    import time as t
-    t0=t.time()
-
-#    imOUT,psfOUT = ferengi(InputImName,BgName,lowz_info,highz_info,['smooth_galpy_evo.fits','smooth_psfpy_evo.fits'],noconv=False,evo=lum_evolution)
-    imOUT,psfOUT = ferengi(InputImName,BgName,lowz_info,highz_info,['smooth_galpy.fits','smooth_psfpy.fits'],noconv=False,evo=None)
-    print('elapsed %.6f secs'%(t.time()-t0))
-
-#    fig,ax=mpl.subplots(1,2)
-#    ax[0].imshow(imOUT)
-#    ax[1].imshow(psfOUT)
-#    mpl.show()

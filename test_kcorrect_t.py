@@ -15,8 +15,7 @@ catalogs = {
             "F160W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F160W_input_for_Dopterian.txt',
             "F475W":   r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F475W_input_for_Dopterian.txt',
             "F625W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F625W_input_for_Dopterian.txt',
-            "F775W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F775W_input_for_Dopterian.txt',
-            "F814W":   r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F814W_input_for_Dopterian.txt'
+            "F775W":    r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\A209_F775W_input_for_Dopterian.txt'
             
             }
 data = {}
@@ -32,12 +31,12 @@ for key in data:
     common_clashids.intersection_update(data[key]["CLASHID"])
 
 # Crear las listas de listas
-input_image_lists = [[] for _ in range(5)]
-z = [[] for _ in range(5)]
-clustername = [[] for _ in range(5)]
+input_image_lists = [[] for _ in range(4)]
+z = [[] for _ in range(4)]
+clustername = [[] for _ in range(4)]
 
 # Asignar los nombres de los archivos correspondientes a cada filtro, así como zb_1 y clusterName
-filters = ["F160W", "F475W", "F625W", "F775W", "F814W"]
+filters = ["F160W", "F475W", "F625W", "F775W"]
 
 for idx, filter in enumerate(filters):
     for clash_id in common_clashids:
@@ -55,18 +54,18 @@ sci_images_path = [[base_path+"SCI_" + image for image in sublist] for sublist i
 rms_images_path = [[base_path+"RMS_" + image for image in sublist] for sublist in input_image_lists]
 sky_images_path = [[base_path+"sky_" + image for image in sublist] for sublist in input_image_lists]
 
-science_data = [[] for _ in range(5)]
-id_g= [[] for _ in range(5)]
-input_image_path = [[] for _ in range(5)]
-input_rms_path = [[] for _ in range(5)]
-input_sky_path = [[] for _ in range(5)]
-input_z = [[] for _ in range(5)]
-input_exptime = [[] for _ in range(5)]
-input_photflam = [[] for _ in range(5)]
-input_photplam = [[] for _ in range(5)]
-log_photflam = [[] for _ in range(5)]
-log_photplam = [[] for _ in range(5)]
-zp_lo = [[] for _ in range(5)]
+science_data = [[] for _ in range(4)]
+id_g= [[] for _ in range(4)]
+input_image_path = [[] for _ in range(4)]
+input_rms_path = [[] for _ in range(4)]
+input_sky_path = [[] for _ in range(4)]
+input_z = [[] for _ in range(4)]
+input_exptime = [[] for _ in range(4)]
+input_photflam = [[] for _ in range(4)]
+input_photplam = [[] for _ in range(4)]
+log_photflam = [[] for _ in range(4)]
+log_photplam = [[] for _ in range(4)]
+zp_lo = [[] for _ in range(4)]
 
 print("Reading files")
 
@@ -120,16 +119,15 @@ psf_path_list_lo = [
             r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_wfc3ir-65mas_all_f160w_v1_psf.fits',
             r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f475w_v1_psf.fits',
             r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f625w_v1_psf.fits',
-            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f775w_v1_psf.fits',
-            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f814w_v1_psf.fits'
+            r'D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\psf\hlsp_clash_hst_acs-65mas_all_f775w_v1_psf.fits'
         ] 
 
-filter_lo = ['clash_wfc3_f160w','clash_wfc3_f475w','clash_wfc3_f625w','clash_wfc3_f775w','clash_wfc3_f814w']
+filter_lo = ['clash_wfc3_f160w','clash_wfc3_f475w','clash_wfc3_f625w','clash_wfc3_f775w']
 
 #low z effective wavelengths
-lambda_lo = [15405,4770,6310,7647,8057]
+lambda_lo = [15405,4770,6310,7647]
 
-err0_mag = [0.05, 0.05, 0.05, 0.05, 0.05]
+err0_mag = [0.05, 0.05, 0.05, 0.05]
 
 # -----------High z parameters----------- 
 
@@ -147,8 +145,10 @@ zp_hi = zp_lo[-1]
 
 print("Creating kcorrect object...")
 
+responses_map = ['clash_wfc3_f775w']
+
 cos = FlatLambdaCDM(H0=cosmos.H0,Om0=cosmos.Omat,Ob0=cosmos.Obar)
-kc = k.kcorrect.Kcorrect(responses=filter_lo, responses_out=filter_hi,responses_map=filter_hi,cosmo=os)
+kc = k.kcorrect.Kcorrect(responses=filter_lo, responses_out=filter_hi,responses_map=responses_map,cosmo=os)
 
 for i in range(len(input_image_path[0])):#por cada galaxia
     name = id_g[0][i]
@@ -157,8 +157,8 @@ for i in range(len(input_image_path[0])):#por cada galaxia
 
     lowz_info  = {'redshift': input_z[0][i],
                   'psf': psf_path_list_lo,
-                  'zp': [zp_lo[0][i], zp_lo[1][i], zp_lo[2][i], zp_lo[3][i], zp_lo[4][i]],
-                  'exptime': [input_exptime[0][i], input_exptime[1][i], input_exptime[2][i], input_exptime[3][i], input_exptime[4][i]],
+                  'zp': [zp_lo[0][i], zp_lo[1][i], zp_lo[2][i], zp_lo[3][i]],
+                  'exptime': [input_exptime[0][i], input_exptime[1][i], input_exptime[2][i], input_exptime[3][i]],
                   'filter': filter_lo, 
                   'pixscale': pixscale,
                   'lambda': lambda_lo}
@@ -173,16 +173,16 @@ for i in range(len(input_image_path[0])):#por cada galaxia
     
     
     
-    output_sci = "D:\\Documentos\\Diego\\U\\Memoria Titulo\Dopterian\\Input\\A209\\ouput_kcorrect\\fits\\"+"output_sci_"+name
-    output_psf = "D:\\Documentos\\Diego\\U\\Memoria Titulo\Dopterian\\Input\\A209\\ouput_kcorrect\\fits\\"+"output_psf_"+name
+    output_sci = "D:\\Documentos\\Diego\\U\\Memoria Titulo\Dopterian\\Input\\A209\\ouput_kcorrect_t\\fits\\"+"output_sci_"+name
+    output_psf = "D:\\Documentos\\Diego\\U\\Memoria Titulo\Dopterian\\Input\\A209\\ouput_kcorrect_t\\fits\\"+"output_psf_"+name
     print(input_image_path[0][i])
     imOUT,psfOUT,n_pkcorrect= dopt.ferengi(
-                                images = [input_image_path[0][i], input_image_path[1][i], input_image_path[2][i], input_image_path[3][i], input_image_path[4][i]],
-                                background= [input_sky_path[0][i], input_sky_path[1][i], input_sky_path[2][i], input_sky_path[3][i], input_sky_path[4][i]],
+                                images = [input_image_path[0][i], input_image_path[1][i], input_image_path[2][i], input_image_path[3][i]],
+                                background= [input_sky_path[0][i], input_sky_path[1][i], input_sky_path[2][i], input_sky_path[3][i]],
                                 lowz_info = lowz_info, 
                                 highz_info = highz_info, 
                                 namesout= [output_sci, output_psf], 
-                                imerr = [input_rms_path[0][i], input_rms_path[1][i], input_rms_path[2][i], input_rms_path[3][i], input_rms_path[4][i]],
+                                imerr = [input_rms_path[0][i], input_rms_path[1][i], input_rms_path[2][i], input_rms_path[3][i]],
                                 err0_mag = err0_mag, 
                                 noconv=False, 
                                 evo=None, 
@@ -222,7 +222,7 @@ for i in range(len(input_image_path[0])):#por cada galaxia
 
         plt.tight_layout()
 
-        output_dir = r"D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\ouput_kcorrect"
+        output_dir = r"D:\Documentos\Diego\U\Memoria Titulo\Dopterian\Input\A209\ouput_kcorrect_t"
         output_filename = "test_kcorrect_" + galaxy_name + ".png"
         output_path = os.path.join(output_dir, output_filename)
         plt.savefig(output_path)
